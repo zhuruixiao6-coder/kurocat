@@ -10,6 +10,17 @@ import {
 import { catAudio } from './audio';
 import { resolveCustomSkin, type CatSkinConfig, type ResolvedSkin } from './catSkins';
 import { DaFeiYuRenderer, type DaFeiYuLayout } from './dafeiyuRenderer';
+import {
+  ACCESSORY_ART,
+  EFFECT_ART,
+  EFFECT_TRIGGER,
+  accessoryVisible,
+  slotLayer,
+  type ActivityState,
+  type AccentAnchor,
+  type FxMotion,
+} from './collectibles';
+import { drawAccessory } from './accRenderer';
 
 export const LOGICAL_W = 420;
 export const LOGICAL_H = 440;
@@ -667,6 +678,35 @@ export class KuroCatEngine {
   private catBaseY = 308;
   private readonly catHeight = 226;
 
+  // ---- 配饰 / 特效（用敲键盘攒的猫条兑换） ----
+  /** slot -> 配饰 id */
+  private equippedAcc: Record<string, string> = {};
+  private activeFx: string | null = null;
+  private totalKeysAcc = 0;
+  /** 本次按键时间戳（毫秒），用于连击/持续打字判定 */
+  private keyStamps: number[] = [];
+  private typingStreakStart = 0;
+  private accToggled = false;
+  private clickPulseUntil = 0;
+  private feedPulseUntil = 0;
+  private stretchPulseUntil = 0;
+  private hoverHeadSince = 0;
+  private fxParticleBuf: Array<{
+    icon: string;
+    color: string;
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    size: number;
+    born: number;
+    life: number;
+    motion: FxMotion;
+    spin: number;
+  }> = [];
+  private auraUntil = 0;
+  private trailPoints: Array<{ x: number; y: number; at: number }> = [];
+
   // Mechanical keyboard deck below the sitting cat
   private kbCenterX = 214;
   private kbCenterY = 353;
@@ -1083,6 +1123,12 @@ export class KuroCatEngine {
     const spec = resolveKeyByVk(vk, this.keyboardLayout);
     if (!spec) return;
     this.wakeCat(now);
+
+    // 配饰/特效的活动判定：只统计「新的」按键，按住不放不算
+    if (!repeat) {
+      this.accKeyCounter += 1;
+      this.tickFx();
+    }
 
     const anim = this.keyAnims.get(spec.id);
     if (anim) {
@@ -2254,6 +2300,9 @@ export class KuroCatEngine {
       return;
     }
 
+    // Layer 0: 地面/背后配饰（坐垫、纸箱、翅膀、披风……）
+    this.drawAccLayer(ctx, 'behind', breath);
+
     // Layer 1: Mini mouse & mechanical keyboard (both hop organically on grumpy tail desk-slam!)
     this.drawMiniMouse(ctx);
     this.drawKeyboard(ctx);
@@ -2263,6 +2312,9 @@ export class KuroCatEngine {
 
     // Layer 3: Exact measured spine-deformable cat silhouette (ears, cheeks, neck, pear belly, grounded hind feet, eyes & tiny whiskers)
     this.drawCatBody(ctx, breath, purrShift);
+
+    // Layer 3.5: 头部/面部/颈部配饰（帽子、墨镜、围巾……）
+    this.drawAccLayer(ctx, 'body', breath);
 
     // Layer 4: True-scale velvety cat paws (tapered idle legs / planted diagonal mouse support leg / bent curled chest paw / plump round poking paw!)
     this.drawPaw(ctx, this.leftPaw, breath);
@@ -2277,7 +2329,317 @@ export class KuroCatEngine {
       this.drawMouseBadges(ctx);
     }
 
+    // Layer 6: 爪部/道具配饰 + 打字特效粒子
+    this.drawAccLayer(ctx, 'front', breath);
+    this.updateAndDrawFx(ctx, breath);
+
     ctx.restore();
+  }
+
+  // ---- 配饰 / 特效 ----
+
+  /** 由 main.ts 在收到 kuro-profile 时调用 */
+  public setCollectibles(equipped: Record<string, string>, totalKeys: number): void {
+    this.equippedAcc = equipped || {};
+    this.totalKeysAcc = totalKeys || 0;
+    const fx = this.equippedAcc['fx'];
+    this.activeFx = fx && EFFECT_ART[fx] ? fx : null;
+  }
+
+  /** 玩家动作：点击猫 / 喂食 / 切换 / 悬停 / 睡醒 */
+  public notifyAction(action: 'click' | 'feed' | 'toggle' | 'hover' | 'wake'): void {
+    const now = performance.now();
+    switch (action) {
+      case 'click':
+        this.clickPulseUntil = now + 6000;
+        break;
+      case 'feed':
+        this.feedPulseUntil = now + 12000;
+        break;
+      case 'toggle':
+        this.accToggled = !this.accToggled;
+        break;
+      case 'wake':
+        this.stretchPulseUntil = now + 4000;
+        break;
+      case 'hover':
+        this.hoverHeadSince = now;
+        break;
+    }
+    this.lastInputAt = now;
+    this.fireFxForAction(action);
+  }
+
+  private activityState(): ActivityState {
+    const now = performance.now();
+    this.keyStamps = this.keyStamps.filter((t) => now - t < 1000);
+    const combo = this.keyStamps.length;
+    const idleSeconds = this.lastInputAt ? (now - this.lastInputAt) / 1000 : 0;
+    const streak = this.typingStreakStart ? (now - this.typingStreakStart) / 1000 : 0;
+    return {
+      typingActive: idleSeconds < 1.6,
+      combo,
+      idleSeconds,
+      typingStreak: streak,
+      toggled: this.accToggled,
+      clickPulse: now < this.clickPulseUntil,
+      feedPulse: now < this.feedPulseUntil,
+      hoverHead: this.hoverHeadSince > 0 && now - this.hoverHeadSince > 3000,
+      stretchPulse: now < this.stretchPulseUntil,
+      totalKeys: this.totalKeysAcc,
+    };
+  }
+
+  private accAnchor(slot: string, breath: number): AccentAnchor {
+    const dir = this.spineLean >= 0 ? 1 : -1;
+    // 2D 猫头宽约占身高的 0.47；配饰以「头宽 = 60 单位」绘制，所以统一按头宽折算，
+    // 不再是 1:1，否则帽子/眼镜只有头的六成大小。
+    const s = (this.catHeight * 0.505) / 60;
+    const t = this.elapsed;
+    switch (slot) {
+      case 'head': {
+        // t=0 是耳尖，头壳顶端在 t≈0.05 左右，帽子要压在这个位置；
+        // 帽子按「头宽 60 单位」设计但 2D 头实际更小，缩到 0.78 才不会盖住脸
+        const p = this.spinePoint(0.052, breath);
+        return { x: p.x, y: p.y - 2, s: s * 0.78, t, dir };
+      }
+      case 'face': {
+        // 眼睛中线（t≈0.19 才是眼睛，不是 0.157）
+        const p = this.spinePoint(0.19, breath);
+        return { x: p.x, y: p.y, s, t, dir };
+      }
+      case 'neck': {
+        const p = this.spinePoint(0.345, breath);
+        return { x: p.x, y: p.y, s, t, dir };
+      }
+      case 'back': {
+        // 2D 身体很宽，偏移太小会被身体整个盖住
+        const p = this.spinePoint(0.5, breath);
+        return { x: p.x - 52 * dir, y: p.y - 4, s, t, dir };
+      }
+      case 'paw': {
+        const p = this.leftPaw.pos;
+        return { x: p.x, y: p.y, s, t, dir };
+      }
+      case 'prop': {
+        const p = this.rightPaw.pos;
+        return { x: p.x + 22 * s, y: p.y - 8 * s, s, t, dir };
+      }
+      case 'floor':
+      default:
+        return { x: this.catCenterX, y: this.catBaseY + 4 * s, s, t, dir };
+    }
+  }
+
+  private drawAccLayer(ctx: CanvasRenderingContext2D, layer: 'behind' | 'body' | 'front', breath: number): void {
+    const state = this.activityState();
+    if (this.debugAcc) {
+      ctx.save();
+      ctx.fillStyle = '#ff00ff';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'left';
+      let i = 0;
+      ctx.fillText(`L=${layer} keys=${Object.keys(this.equippedAcc).join(',')}`, 4, 12 + i * 11);
+      for (const slot of Object.keys(this.equippedAcc)) {
+        i += 1;
+        const id = this.equippedAcc[slot];
+        const a = this.accAnchor(slot, breath);
+        ctx.fillText(`${slot}:${id} art=${ACCESSORY_ART[id] ? ACCESSORY_ART[id].shape : 'NONE'} y=${a.y.toFixed(0)} s=${a.s.toFixed(2)}`, 4, 12 + i * 11);
+        ctx.fillStyle = '#00ffff';
+        ctx.fillRect(a.x - 2, a.y - 2, 4, 4);
+        ctx.fillStyle = '#ff00ff';
+      }
+      ctx.restore();
+    }
+    for (const slot of Object.keys(this.equippedAcc)) {
+      const id = this.equippedAcc[slot];
+      if (!id || !ACCESSORY_ART[id]) continue;
+      if (slotLayer(slot) !== layer) continue;
+      const trigger = this.accTriggerOf(id);
+      if (trigger && !accessoryVisible(trigger, state)) continue;
+      drawAccessory(ctx, id, this.accAnchor(slot, breath));
+    }
+  }
+
+  private accTriggerOf(id: string): string | null {
+    const item = this.shopTriggerMap[id];
+    return item ?? null;
+  }
+
+  /** main.ts 会把 Rust 侧的 trigger 文案灌进来 */
+  public shopTriggerMap: Record<string, string> = {};
+  public debugAcc = false;
+
+  private fxOrigin(): { x: number; y: number } {
+    const p = this.spinePoint(0.28, 0);
+    return { x: p.x, y: p.y };
+  }
+
+  private spawnFx(count: number): void {
+    const fx = this.activeFx;
+    if (!fx) return;
+    const art = EFFECT_ART[fx];
+    if (!art) return;
+    const now = performance.now();
+    const o = this.fxOrigin();
+    for (let i = 0; i < count; i += 1) {
+      const ang = Math.random() * Math.PI * 2;
+      const spread = art.motion === 'burst' ? 120 : 26;
+      this.fxParticleBuf.push({
+        icon: art.icon,
+        color: art.color,
+        x: o.x + (Math.random() - 0.5) * 54,
+        y: o.y + (Math.random() - 0.5) * 30,
+        vx: Math.cos(ang) * spread * 0.35,
+        vy: art.motion === 'fall' ? 26 : art.motion === 'rise' ? -34 : -Math.abs(Math.sin(ang)) * spread * 0.4,
+        size: 12 + Math.random() * 8,
+        born: now,
+        life: 900 + Math.random() * 700,
+        motion: art.motion,
+        spin: (Math.random() - 0.5) * 2.4,
+      });
+    }
+    if (this.fxParticleBuf.length > 160) {
+      this.fxParticleBuf.splice(0, this.fxParticleBuf.length - 160);
+    }
+    if (art.motion === 'aura' || art.motion === 'orbit' || art.motion === 'ring' || art.motion === 'trail') {
+      this.auraUntil = now + 1400;
+    }
+  }
+
+  private fireFxForAction(action: 'click' | 'feed' | 'toggle' | 'hover' | 'wake'): void {
+    const fx = this.activeFx;
+    if (!fx) return;
+    const trig = EFFECT_TRIGGER[fx];
+    if (!trig) return;
+    const kind = trig.kind;
+    if (
+      (action === 'click' && kind === 'click') ||
+      (action === 'feed' && kind === 'feed') ||
+      (action === 'wake' && kind === 'stretch') ||
+      (action === 'hover' && kind === 'hover')
+    ) {
+      this.spawnFx(kind === 'click' ? 4 : 5);
+    }
+  }
+
+  /** 每次「新的」按键后调用，判断当前装备的特效是否该迸发 */
+  private tickFx(): void {
+    const now = performance.now();
+    this.keyStamps.push(now);
+    if (this.keyStamps.length > 24) this.keyStamps.shift();
+    if (!this.typingStreakStart) this.typingStreakStart = now;
+    this.lastInputAt = now;
+
+    const fx = this.activeFx;
+    if (!fx) return;
+    const trig = EFFECT_TRIGGER[fx];
+    if (!trig) return;
+    switch (trig.kind) {
+      case 'always':
+        this.spawnFx(3);
+        break;
+      case 'everyN':
+        if (this.keyStamps.length >= 1 && this.accKeyCounter % trig.n === 0) this.spawnFx(3);
+        break;
+      case 'typing':
+        this.spawnFx(1);
+        break;
+      case 'combo': {
+        const perSec = this.keyStamps.filter((t) => now - t < 1000).length;
+        if (perSec >= 6) this.spawnFx(2);
+        break;
+      }
+      case 'streak':
+        if (this.typingStreakStart && now - this.typingStreakStart > 30000) this.spawnFx(2);
+        break;
+      case 'milestone':
+        if (this.totalKeysAcc > 0 && this.totalKeysAcc % trig.n === 0) this.spawnFx(6);
+        break;
+      default:
+        break;
+    }
+  }
+
+  private accKeyCounter = 0;
+
+  private nextAmbientFxAt = 0;
+
+  private updateAndDrawFx(ctx: CanvasRenderingContext2D, _breath: number): void {
+    const now = performance.now();
+    const fx = this.activeFx;
+    const art = fx ? EFFECT_ART[fx] : null;
+
+    // 常驻：不等按键也持续冒粒子
+    if (art) {
+      if (now >= this.nextAmbientFxAt) {
+        this.nextAmbientFxAt = now + (art.motion === 'aura' || art.motion === 'orbit' || art.motion === 'ring' ? 260 : 180);
+        this.spawnFx(1);
+        if (art.motion === 'aura' || art.motion === 'orbit' || art.motion === 'ring') {
+          this.auraUntil = now + 1200;
+        }
+      }
+    }
+
+    // 光环 / 环绕 / 涟漪：以猫为中心画一圈
+    if (art && now < this.auraUntil) {
+      const o = this.fxOrigin();
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      if (art.motion === 'ring') {
+        const r = 40 + ((now / 6) % 70);
+        ctx.beginPath();
+        ctx.ellipse(o.x, o.y + 30, r, r * 0.4, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = art.color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      } else if (art.motion === 'orbit') {
+        for (let i = 0; i < 3; i += 1) {
+          const a = now / 900 + (i * Math.PI * 2) / 3;
+          ctx.font = '14px system-ui, "Segoe UI Emoji", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(art.icon, o.x + Math.cos(a) * 46, o.y + 20 + Math.sin(a) * 16);
+        }
+      } else if (art.motion === 'aura') {
+        ctx.beginPath();
+        ctx.ellipse(o.x, o.y + 26, 56, 44, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = art.color;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      } else if (art.motion === 'trail') {
+        this.trailPoints.push({ x: o.x, y: o.y + 40, at: now });
+        this.trailPoints = this.trailPoints.filter((p) => now - p.at < 1200);
+        this.trailPoints.forEach((p, i) => {
+          const alpha = 1 - (now - p.at) / 1200;
+          ctx.globalAlpha = alpha * 0.7;
+          ctx.fillStyle = `hsl(${(i * 26 + now / 20) % 360} 90% 62%)`;
+          ctx.fillRect(p.x - 3, p.y - 2, 6, 4);
+        });
+      }
+      ctx.restore();
+    }
+
+    if (this.fxParticleBuf.length === 0) return;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (const p of this.fxParticleBuf) {
+      const age = now - p.born;
+      const k = age / p.life;
+      if (k >= 1) continue;
+      const x = p.x + p.vx * (age / 1000);
+      const y =
+        p.y +
+        p.vy * (age / 1000) +
+        (p.motion === 'rise' ? -18 * (age / 1000) : p.motion === 'fall' ? 26 * (age / 1000) : 0);
+      const alpha = k < 0.15 ? k / 0.15 : 1 - (k - 0.15) / 0.85;
+      ctx.globalAlpha = Math.max(0, alpha) * 0.95;
+      ctx.font = `${p.size.toFixed(0)}px system-ui, "Segoe UI Emoji", sans-serif`;
+      ctx.fillStyle = p.color;
+      ctx.fillText(p.icon, x, y);
+    }
+    ctx.restore();
+    this.fxParticleBuf = this.fxParticleBuf.filter((p) => now - p.born < p.life);
   }
 
   private onTailDeskSlam(now: number): void {

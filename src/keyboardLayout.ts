@@ -1,4 +1,4 @@
-export type KeyboardLayoutId = '65' | '108';
+export type KeyboardLayoutId = '65' | '75' | '108';
 
 export interface KeySpec {
   id: string;
@@ -97,6 +97,97 @@ export const KEYBOARD_KEYS_65: KeySpec[] = [
   { id: 'down', label: '↓', bubble: '↓', row: 4, uStart: 12, uWidth: 1, accent: 'mod', vkCodes: [0x28, 0x22] },
   { id: 'up', label: '↑', bubble: '↑', row: 4, uStart: 13, uWidth: 1, accent: 'mod', vkCodes: [0x26, 0x21] },
   { id: 'right', label: '→', bubble: '→', row: 4, uStart: 14, uWidth: 1, accent: 'mod', vkCodes: [0x27] },
+];
+
+// ROG 风格 75%：F 排 + 数字排 + 主键区 + 右侧导航列 + 底部方向键（17U x 6 行）
+export const KEYBOARD_KEYS_75: KeySpec[] = [
+  // Row 0: Esc + F1..F12
+  { id: 'esc', label: 'Esc', bubble: 'Esc', row: 0, rowY: 0, uStart: 0, uWidth: 1, accent: 'orange', vkCodes: [0x1b] },
+  { id: 'f1', label: 'F1', bubble: 'F1', row: 0, rowY: 0, uStart: 1, uWidth: 1, vkCodes: [0x70] },
+  { id: 'f2', label: 'F2', bubble: 'F2', row: 0, rowY: 0, uStart: 2, uWidth: 1, vkCodes: [0x71] },
+  { id: 'f3', label: 'F3', bubble: 'F3', row: 0, rowY: 0, uStart: 3, uWidth: 1, vkCodes: [0x72] },
+  { id: 'f4', label: 'F4', bubble: 'F4', row: 0, rowY: 0, uStart: 4, uWidth: 1, vkCodes: [0x73] },
+  { id: 'f5', label: 'F5', bubble: 'F5', row: 0, rowY: 0, uStart: 5, uWidth: 1, accent: 'mod', vkCodes: [0x74] },
+  { id: 'f6', label: 'F6', bubble: 'F6', row: 0, rowY: 0, uStart: 6, uWidth: 1, accent: 'mod', vkCodes: [0x75] },
+  { id: 'f7', label: 'F7', bubble: 'F7', row: 0, rowY: 0, uStart: 7, uWidth: 1, accent: 'mod', vkCodes: [0x76] },
+  { id: 'f8', label: 'F8', bubble: 'F8', row: 0, rowY: 0, uStart: 8, uWidth: 1, accent: 'mod', vkCodes: [0x77] },
+  { id: 'f9', label: 'F9', bubble: 'F9', row: 0, rowY: 0, uStart: 9, uWidth: 1, vkCodes: [0x78] },
+  { id: 'f10', label: 'F10', bubble: 'F10', row: 0, rowY: 0, uStart: 10, uWidth: 1, vkCodes: [0x79] },
+  { id: 'f11', label: 'F11', bubble: 'F11', row: 0, rowY: 0, uStart: 11, uWidth: 1, vkCodes: [0x7a] },
+  { id: 'f12', label: 'F12', bubble: 'F12', row: 0, rowY: 0, uStart: 12, uWidth: 1, vkCodes: [0x7b] },
+  // Row 1: ` 1..0 - = Backspace | Del
+  { id: 'grave', label: '`', bubble: '`', row: 1, rowY: 1, uStart: 0, uWidth: 1, vkCodes: [0xc0] },
+  { id: '1', label: '1', bubble: '1', row: 1, rowY: 1, uStart: 1, uWidth: 1, vkCodes: [0x31] },
+  { id: '2', label: '2', bubble: '2', row: 1, rowY: 1, uStart: 2, uWidth: 1, vkCodes: [0x32] },
+  { id: '3', label: '3', bubble: '3', row: 1, rowY: 1, uStart: 3, uWidth: 1, vkCodes: [0x33] },
+  { id: '4', label: '4', bubble: '4', row: 1, rowY: 1, uStart: 4, uWidth: 1, vkCodes: [0x34] },
+  { id: '5', label: '5', bubble: '5', row: 1, rowY: 1, uStart: 5, uWidth: 1, vkCodes: [0x35] },
+  { id: '6', label: '6', bubble: '6', row: 1, rowY: 1, uStart: 6, uWidth: 1, vkCodes: [0x36] },
+  { id: '7', label: '7', bubble: '7', row: 1, rowY: 1, uStart: 7, uWidth: 1, vkCodes: [0x37] },
+  { id: '8', label: '8', bubble: '8', row: 1, rowY: 1, uStart: 8, uWidth: 1, vkCodes: [0x38] },
+  { id: '9', label: '9', bubble: '9', row: 1, rowY: 1, uStart: 9, uWidth: 1, vkCodes: [0x39] },
+  { id: '0', label: '0', bubble: '0', row: 1, rowY: 1, uStart: 10, uWidth: 1, vkCodes: [0x3a] },
+  { id: 'minus', label: '-', bubble: '-', row: 1, rowY: 1, uStart: 11, uWidth: 1, vkCodes: [0xbd] },
+  { id: 'equal', label: '=', bubble: '=', row: 1, rowY: 1, uStart: 12, uWidth: 1, vkCodes: [0xbb] },
+  { id: 'bs', label: '⌫', bubble: '⌫', row: 1, rowY: 1, uStart: 13, uWidth: 2, accent: 'mod', vkCodes: [0x8] },
+  { id: 'del', label: 'Del', bubble: 'Del', row: 1, rowY: 1, uStart: 15, uWidth: 1, accent: 'mod', vkCodes: [0x2e] },
+  // Row 2: Tab Q..P [ ] \ | PgUp
+  { id: 'tab', label: '↹', bubble: '↹', row: 2, rowY: 2, uStart: 0, uWidth: 1.5, accent: 'mod', vkCodes: [0x9] },
+  { id: 'q', label: 'Q', bubble: 'Q', row: 2, rowY: 2, uStart: 1.5, uWidth: 1, vkCodes: [0x51] },
+  { id: 'w', label: 'W', bubble: 'W', row: 2, rowY: 2, uStart: 2.5, uWidth: 1, vkCodes: [0x52] },
+  { id: 'e', label: 'E', bubble: 'E', row: 2, rowY: 2, uStart: 3.5, uWidth: 1, vkCodes: [0x53] },
+  { id: 'r', label: 'R', bubble: 'R', row: 2, rowY: 2, uStart: 4.5, uWidth: 1, vkCodes: [0x54] },
+  { id: 't', label: 'T', bubble: 'T', row: 2, rowY: 2, uStart: 5.5, uWidth: 1, vkCodes: [0x55] },
+  { id: 'y', label: 'Y', bubble: 'Y', row: 2, rowY: 2, uStart: 6.5, uWidth: 1, vkCodes: [0x56] },
+  { id: 'u', label: 'U', bubble: 'U', row: 2, rowY: 2, uStart: 7.5, uWidth: 1, vkCodes: [0x57] },
+  { id: 'i', label: 'I', bubble: 'I', row: 2, rowY: 2, uStart: 8.5, uWidth: 1, vkCodes: [0x58] },
+  { id: 'o', label: 'O', bubble: 'O', row: 2, rowY: 2, uStart: 9.5, uWidth: 1, vkCodes: [0x59] },
+  { id: 'p', label: 'P', bubble: 'P', row: 2, rowY: 2, uStart: 10.5, uWidth: 1, vkCodes: [0x5a] },
+  { id: 'lb', label: '[', bubble: '[', row: 2, rowY: 2, uStart: 11.5, uWidth: 1, vkCodes: [0xdb] },
+  { id: 'rb', label: ']', bubble: ']', row: 2, rowY: 2, uStart: 12.5, uWidth: 1, vkCodes: [0xdd] },
+  { id: 'bslash', label: '\\', bubble: '\\', row: 2, rowY: 2, uStart: 13.5, uWidth: 1.5, accent: 'mod', vkCodes: [0xdc] },
+  { id: 'pgup', label: 'PgUp', bubble: 'PgUp', row: 2, rowY: 2, uStart: 15, uWidth: 1, accent: 'mod', vkCodes: [0x21] },
+  // Row 3: Caps A..L ; ' Enter | PgDn
+  { id: 'caps', label: '⇪', bubble: '⇪', row: 3, rowY: 3, uStart: 0, uWidth: 1.75, accent: 'mod', vkCodes: [0x14] },
+  { id: 'a', label: 'A', bubble: 'A', row: 3, rowY: 3, uStart: 1.75, uWidth: 1, vkCodes: [0x41] },
+  { id: 's', label: 'S', bubble: 'S', row: 3, rowY: 3, uStart: 2.75, uWidth: 1, vkCodes: [0x42] },
+  { id: 'd', label: 'D', bubble: 'D', row: 3, rowY: 3, uStart: 3.75, uWidth: 1, vkCodes: [0x43] },
+  { id: 'f', label: 'F', bubble: 'F', row: 3, rowY: 3, uStart: 4.75, uWidth: 1, vkCodes: [0x44] },
+  { id: 'g', label: 'G', bubble: 'G', row: 3, rowY: 3, uStart: 5.75, uWidth: 1, vkCodes: [0x45] },
+  { id: 'h', label: 'H', bubble: 'H', row: 3, rowY: 3, uStart: 6.75, uWidth: 1, vkCodes: [0x46] },
+  { id: 'j', label: 'J', bubble: 'J', row: 3, rowY: 3, uStart: 7.75, uWidth: 1, vkCodes: [0x47] },
+  { id: 'k', label: 'K', bubble: 'K', row: 3, rowY: 3, uStart: 8.75, uWidth: 1, vkCodes: [0x48] },
+  { id: 'l', label: 'L', bubble: 'L', row: 3, rowY: 3, uStart: 9.75, uWidth: 1, vkCodes: [0x49] },
+  { id: 'semi', label: ';', bubble: ';', row: 3, rowY: 3, uStart: 10.75, uWidth: 1, vkCodes: [0xba] },
+  { id: 'quote', label: "'", bubble: "'", row: 3, rowY: 3, uStart: 11.75, uWidth: 1, vkCodes: [0xde] },
+  { id: 'enter', label: '↵', bubble: '↵', row: 3, rowY: 3, uStart: 12.75, uWidth: 2.25, accent: 'mod', vkCodes: [0xd, 0x10d] },
+  { id: 'pgdn', label: 'PgDn', bubble: 'PgDn', row: 3, rowY: 3, uStart: 15, uWidth: 1, accent: 'mod', vkCodes: [0x22] },
+  // Row 4: LShift Z..M , . / RShift | Ins
+  { id: 'lshift', label: '⇧', bubble: '⇧', row: 4, rowY: 4, uStart: 0, uWidth: 2.25, accent: 'mod', vkCodes: [0xa0, 0x10] },
+  { id: 'z', label: 'Z', bubble: 'Z', row: 4, rowY: 4, uStart: 2.25, uWidth: 1, vkCodes: [0x5a] },
+  { id: 'x', label: 'X', bubble: 'X', row: 4, rowY: 4, uStart: 3.25, uWidth: 1, vkCodes: [0x5b] },
+  { id: 'c', label: 'C', bubble: 'C', row: 4, rowY: 4, uStart: 4.25, uWidth: 1, vkCodes: [0x5c] },
+  { id: 'v', label: 'V', bubble: 'V', row: 4, rowY: 4, uStart: 5.25, uWidth: 1, vkCodes: [0x5d] },
+  { id: 'b', label: 'B', bubble: 'B', row: 4, rowY: 4, uStart: 6.25, uWidth: 1, vkCodes: [0x5e] },
+  { id: 'n', label: 'N', bubble: 'N', row: 4, rowY: 4, uStart: 7.25, uWidth: 1, vkCodes: [0x5f] },
+  { id: 'm', label: 'M', bubble: 'M', row: 4, rowY: 4, uStart: 8.25, uWidth: 1, vkCodes: [0x60] },
+  { id: 'comma', label: ',', bubble: ',', row: 4, rowY: 4, uStart: 9.25, uWidth: 1, vkCodes: [0xbc] },
+  { id: 'dot', label: '.', bubble: '.', row: 4, rowY: 4, uStart: 10.25, uWidth: 1, vkCodes: [0xbe] },
+  { id: 'slash', label: '/', bubble: '/', row: 4, rowY: 4, uStart: 11.25, uWidth: 1, vkCodes: [0xbf] },
+  { id: 'rshift', label: '⇧', bubble: '⇧', row: 4, rowY: 4, uStart: 12.25, uWidth: 1.75, accent: 'orange', vkCodes: [0xa1] },
+  { id: 'ins', label: 'Ins', bubble: 'Ins', row: 4, rowY: 4, uStart: 15, uWidth: 1, accent: 'mod', vkCodes: [0x2d] },
+  // Row 5: Ctrl Win Alt Space Alt Fn Ctrl | ← ↓ ↑ →
+  { id: 'lctrl', label: 'Ctrl', bubble: 'Ctrl', row: 5, rowY: 5, uStart: 0, uWidth: 1.25, accent: 'orange', vkCodes: [0xa2, 0x11] },
+  { id: 'lwin', label: 'Win', bubble: 'Win', row: 5, rowY: 5, uStart: 1.25, uWidth: 1.25, accent: 'mod', vkCodes: [0x5b] },
+  { id: 'lalt', label: 'Alt', bubble: 'Alt', row: 5, rowY: 5, uStart: 2.5, uWidth: 1.25, accent: 'mod', vkCodes: [0xa4] },
+  { id: 'space', label: '␣', bubble: '␣', row: 5, rowY: 5, uStart: 3.75, uWidth: 6.25, accent: 'mod', vkCodes: [0x20] },
+  { id: 'ralt', label: 'Alt', bubble: 'Alt', row: 5, rowY: 5, uStart: 10, uWidth: 1, accent: 'mod', vkCodes: [0xa5] },
+  { id: 'fn', label: 'Fn', bubble: 'Fn', row: 5, rowY: 5, uStart: 11, uWidth: 1, accent: 'mod', vkCodes: [0x0] },
+  { id: 'rctrl', label: 'Ctrl', bubble: 'Ctrl', row: 5, rowY: 5, uStart: 12, uWidth: 1, accent: 'mod', vkCodes: [0xa3] },
+  { id: 'left', label: '←', bubble: '←', row: 5, rowY: 5, uStart: 13, uWidth: 1, accent: 'mod', vkCodes: [0x25] },
+  { id: 'down', label: '↓', bubble: '↓', row: 5, rowY: 5, uStart: 14, uWidth: 1, accent: 'mod', vkCodes: [0x28] },
+  { id: 'up', label: '↑', bubble: '↑', row: 5, rowY: 5, uStart: 15, uWidth: 1, accent: 'mod', vkCodes: [0x26] },
+  { id: 'right', label: '→', bubble: '→', row: 5, rowY: 5, uStart: 16, uWidth: 1, accent: 'mod', vkCodes: [0x27] },
 ];
 
 // Authentic full-size 108-key ANSI mechanical keyboard (22.7U x 6.25 rows; 20 + 21 + 21 + 16 + 17 + 13 = 108 keys!)
@@ -234,6 +325,12 @@ export const KEYBOARD_LAYOUTS: Record<KeyboardLayoutId, KeyboardLayoutDef> = {
     totalRows: 5,
     keys: KEYBOARD_KEYS_65,
   },
+  '75': {
+    id: '75',
+    totalUnits: 17,
+    totalRows: 6,
+    keys: KEYBOARD_KEYS_75,
+  },
   '108': {
     id: '108',
     totalUnits: 22.7,
@@ -244,10 +341,11 @@ export const KEYBOARD_LAYOUTS: Record<KeyboardLayoutId, KeyboardLayoutDef> = {
 
 const vkLookups: Record<KeyboardLayoutId, Map<number, KeySpec>> = {
   '65': new Map<number, KeySpec>(),
+  '75': new Map<number, KeySpec>(),
   '108': new Map<number, KeySpec>(),
 };
 
-for (const layoutId of ['65', '108'] as const) {
+for (const layoutId of ['65', '75', '108'] as const) {
   for (const key of KEYBOARD_LAYOUTS[layoutId].keys) {
     for (const vk of key.vkCodes) {
       vkLookups[layoutId].set(vk, key);
@@ -262,6 +360,12 @@ export function getKeyboardLayout(layoutId: KeyboardLayoutId): KeyboardLayoutDef
 export function resolveKeyByVk(vk: number, layoutId: KeyboardLayoutId = '65'): KeySpec | null {
   const direct = vkLookups[layoutId].get(vk);
   if (direct) return direct;
+  if ((layoutId === '65' || layoutId === '75') && vk >= 0x70 && vk <= 0x7b) {
+    const idx = vk - 0x6f;
+    const list = layoutId === '75' ? KEYBOARD_KEYS_75 : KEYBOARD_KEYS_65;
+    const hit = list.find((k) => k.id === `f${idx}`);
+    if (hit) return hit;
+  }
   if (layoutId === '65' && vk >= 0x70 && vk <= 0x87) {
     const idx = Math.min(12, Math.max(1, vk - 0x6f));
     return KEYBOARD_KEYS_65[idx] ?? KEYBOARD_KEYS_65[0];

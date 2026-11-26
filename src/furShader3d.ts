@@ -410,6 +410,8 @@ export class FurShaderSystem {
       // GPU body+head deformation uniforms (eliminates 4,745-vert CPU deformation + computeVertexNormals + PCIe upload every frame!)
       uBend: { value: new THREE.Vector4(0, 0, 0, 0) }, // (x, z, squash, bellySwell)
       uHeadRot: { value: new THREE.Vector3(-0.04, 0, 0) }, // (pitch, yaw, roll) Euler YXZ
+      uCoatMap: { value: null as THREE.Texture | null },
+      uCoatAmt: { value: 0 },
     };
   }
 
@@ -441,7 +443,13 @@ export class FurShaderSystem {
       varying vec3 vNormal;
       varying vec3 vViewDir;
       varying float vAlong;
+      #ifdef CAT_BODY
+        varying vec2 vCoatUv;
+      #endif
       void main() {
+        #ifdef CAT_BODY
+          vCoatUv = uv;
+        #endif
         #if defined(CAT_BODY) || defined(EAR)
           vRest = rest;
         #else
@@ -517,6 +525,11 @@ export class FurShaderSystem {
     const fragmentShader = `
       uniform vec3 uFur, uLight, uDark, uPatchA, uPatchB, uPoint, uInner, uPawColor, uEarOuter, uTailBase;
       uniform float uStripes, uMuzzle, uBib, uCalico, uTuxedo, uPoints, uInnerAmt, uShade, uIsDarkFur, uEarOuterAmt, uTailBaseAmt;
+      #ifdef CAT_BODY
+        uniform sampler2D uCoatMap;
+        uniform float uCoatAmt;
+        varying vec2 vCoatUv;
+      #endif
       uniform int uSpotCount;
       uniform vec4 uSpotPos[${MAX_CUSTOM_SPOTS}];
       uniform vec4 uSpotCol[${MAX_CUSTOM_SPOTS}];
@@ -748,6 +761,14 @@ export class FurShaderSystem {
           }
         #endif
 
+        #ifdef CAT_BODY
+          // 一比一毛色贴图：直接替换掉程序化斑纹，再走同一套光照
+          if (uCoatAmt > 0.001) {
+            vec3 coat = texture2D(uCoatMap, vCoatUv).rgb;
+            col = mix(col, coat, uCoatAmt);
+          }
+        #endif
+
         // Designer-vinyl / soft matte-velvet 3D studio lighting (inspired by KuroCat app icon — ZERO KeyCat white outline!)
         vec3 n = normalize(vNormal);
         vec3 v = normalize(vViewDir);
@@ -798,6 +819,12 @@ export class FurShaderSystem {
       fragmentShader,
       defines,
     });
+  }
+
+  /** 设置一比一毛色贴图（null = 关闭） */
+  public setCoat(tex: THREE.Texture | null, amount = 0.92): void {
+    this.uniforms.uCoatMap.value = tex;
+    this.uniforms.uCoatAmt.value = tex ? amount : 0;
   }
 
   public applyPalette(p: FurPalette3D, spots: CatSpot[] = []): void {

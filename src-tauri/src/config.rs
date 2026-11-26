@@ -35,11 +35,9 @@ pub fn default_render_mode() -> String {
     "3d".to_string()
 }
 
-pub fn normalize_render_mode(raw: &str) -> String {
-    match raw.trim().to_ascii_lowercase().as_str() {
-        "2d" => "2d".to_string(),
-        _ => "3d".to_string(),
-    }
+/// 2D 视角已下线：任何来源（旧配置 / MCP / 手工改 json）都归一成 3d。
+pub fn normalize_render_mode(_raw: &str) -> String {
+    "3d".to_string()
 }
 
 pub fn default_collar_color() -> String {
@@ -60,6 +58,43 @@ pub fn default_headphone_mode() -> String {
     "off".to_string()
 }
 
+pub fn default_key_sound_enabled() -> bool {
+    true
+}
+
+pub fn default_key_sound_volume() -> u8 {
+    55
+}
+
+pub fn default_key_sound_style() -> String {
+    "mechanical".to_string()
+}
+
+pub fn default_key_sound_pack() -> String {
+    String::new()
+}
+
+/// A pack is just a folder name; strip anything that could escape the sounds
+/// directory and cap the length so a hand-edited settings.json stays harmless.
+pub fn normalize_key_sound_pack(raw: &str) -> String {
+    let cleaned: String = raw
+        .trim()
+        .chars()
+        .filter(|c| *c != '/' && *c != '\\' && *c != ':' && !c.is_control())
+        .collect();
+    let trimmed = cleaned.trim_matches('.').trim().to_string();
+    trimmed.chars().take(96).collect()
+}
+
+pub fn normalize_key_sound_style(raw: &str) -> String {
+    let id = raw.trim().to_ascii_lowercase();
+    match id.as_str() {
+        "blue" | "thock" | "soft" | "typewriter" | "bubble" | "woodblock" | "droplet" | "coin"
+        | "meow" | "custom" => id,
+        _ => "mechanical".to_string(),
+    }
+}
+
 pub fn normalize_headphone_mode(raw: &str) -> String {
     match raw.trim().to_ascii_lowercase().as_str() {
         "auto" => "auto".to_string(),
@@ -77,10 +112,10 @@ pub fn default_keyboard_layout() -> String {
 }
 
 pub fn normalize_keyboard_layout(raw: &str) -> String {
-    if raw.trim() == "108" {
-        "108".to_string()
-    } else {
-        "65".to_string()
+    match raw.trim() {
+        "108" => "108".to_string(),
+        "75" => "75".to_string(),
+        _ => "65".to_string(),
     }
 }
 
@@ -154,6 +189,14 @@ pub struct AppSettings {
     pub click_through_locked: bool,
     pub show_key_bubbles: bool,
     pub sound_enabled: bool,
+    #[serde(default = "default_key_sound_enabled")]
+    pub key_sound_enabled: bool,
+    #[serde(default = "default_key_sound_volume")]
+    pub key_sound_volume: u8,
+    #[serde(default = "default_key_sound_style")]
+    pub key_sound_style: String,
+    #[serde(default = "default_key_sound_pack")]
+    pub key_sound_pack: String,
     pub autostart: bool,
     #[serde(default = "default_cat_breed")]
     pub cat_breed: String,
@@ -165,6 +208,8 @@ pub struct AppSettings {
     pub keyboard_layout: String,
     #[serde(default = "default_keyboard_orientation")]
     pub keyboard_orientation: String,
+    #[serde(default)]
+    pub keyboard_preset: String,
     #[serde(default = "default_privacy_password_guard")]
     pub privacy_password_guard: bool,
     #[serde(default = "default_tail_key_mode")]
@@ -199,12 +244,17 @@ impl Default for AppSettings {
             click_through_locked: false,
             show_key_bubbles: true,
             sound_enabled: true,
+            key_sound_enabled: default_key_sound_enabled(),
+            key_sound_volume: default_key_sound_volume(),
+            key_sound_style: default_key_sound_style(),
+            key_sound_pack: default_key_sound_pack(),
             autostart: false,
             cat_breed: default_cat_breed(),
             mcp_enabled: default_mcp_enabled(),
             mcp_port: default_mcp_port(),
             keyboard_layout: default_keyboard_layout(),
             keyboard_orientation: default_keyboard_orientation(),
+            keyboard_preset: String::new(),
             privacy_password_guard: default_privacy_password_guard(),
             tail_key_mode: default_tail_key_mode(),
             tail_key_ids: default_tail_key_ids(),
@@ -258,6 +308,9 @@ pub fn load_settings() -> AppSettings {
             parsed.render_mode = normalize_render_mode(&parsed.render_mode);
             parsed.collar_color = normalize_collar_color(&parsed.collar_color);
             parsed.headphone_mode = normalize_headphone_mode(&parsed.headphone_mode);
+            parsed.key_sound_volume = parsed.key_sound_volume.min(100);
+            parsed.key_sound_style = normalize_key_sound_style(&parsed.key_sound_style);
+            parsed.key_sound_pack = normalize_key_sound_pack(&parsed.key_sound_pack);
             return parsed;
         }
     }

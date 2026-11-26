@@ -1,0 +1,1148 @@
+{
+  "standard": "拥有独立精细构建器(build*Fine)或本轮手工重做",
+  "kept": [
+    {
+      "id": "acc_back_08_1",
+      "name": "小披风",
+      "slot": "back",
+      "shape": "cape"
+    },
+    {
+      "id": "acc_back_angelwings",
+      "name": "小天使翅膀",
+      "slot": "back",
+      "shape": "wingsAngel"
+    },
+    {
+      "id": "acc_back_backpack",
+      "name": "小背包",
+      "slot": "back",
+      "shape": "backpack"
+    },
+    {
+      "id": "acc_back_butterfly",
+      "name": "蝴蝶翅膀",
+      "slot": "back",
+      "shape": "wingsButterfly"
+    },
+    {
+      "id": "acc_back_cape",
+      "name": "小披风",
+      "slot": "back",
+      "shape": "cape"
+    },
+    {
+      "id": "acc_back_devilwings",
+      "name": "恶魔翅膀",
+      "slot": "back",
+      "shape": "wingsDevil"
+    },
+    {
+      "id": "acc_face_01_1",
+      "name": "圆框眼镜",
+      "slot": "face",
+      "shape": "glassesRound"
+    },
+    {
+      "id": "acc_face_blush",
+      "name": "腮红贴",
+      "slot": "face",
+      "shape": "blush"
+    },
+    {
+      "id": "acc_face_eyepatch",
+      "name": "单眼眼罩",
+      "slot": "face",
+      "shape": "eyePatch"
+    },
+    {
+      "id": "acc_face_goggles",
+      "name": "电竞护目镜",
+      "slot": "face",
+      "shape": "goggles"
+    },
+    {
+      "id": "acc_face_heartshades",
+      "name": "心形墨镜",
+      "slot": "face",
+      "shape": "glassesHeart"
+    },
+    {
+      "id": "acc_face_mask",
+      "name": "小口罩",
+      "slot": "face",
+      "shape": "mask"
+    },
+    {
+      "id": "acc_face_pixelshades",
+      "name": "像素墨镜",
+      "slot": "face",
+      "shape": "glassesPixel"
+    },
+    {
+      "id": "acc_face_round",
+      "name": "圆框眼镜",
+      "slot": "face",
+      "shape": "glassesRound"
+    },
+    {
+      "id": "acc_floor_01_1",
+      "name": "圆形坐垫",
+      "slot": "floor",
+      "shape": "cushion"
+    },
+    {
+      "id": "acc_floor_cushion",
+      "name": "圆形坐垫",
+      "slot": "floor",
+      "shape": "cushion"
+    },
+    {
+      "id": "acc_head_antler",
+      "name": "鹿角发箍",
+      "slot": "head",
+      "shape": "antler"
+    },
+    {
+      "id": "acc_head_baseball",
+      "name": "棒球帽",
+      "slot": "head",
+      "shape": "cap"
+    },
+    {
+      "id": "acc_head_beanie",
+      "name": "针织毛线帽",
+      "slot": "head",
+      "shape": "beanie"
+    },
+    {
+      "id": "acc_head_catear",
+      "name": "猫耳发箍",
+      "slot": "head",
+      "shape": "earband"
+    },
+    {
+      "id": "acc_head_chef",
+      "name": "厨师帽",
+      "slot": "head",
+      "shape": "chefHat"
+    },
+    {
+      "id": "acc_head_crown",
+      "name": "小皇冠",
+      "slot": "head",
+      "shape": "crown"
+    },
+    {
+      "id": "acc_head_nightcap",
+      "name": "睡帽",
+      "slot": "head",
+      "shape": "nightcap"
+    },
+    {
+      "id": "acc_head_party",
+      "name": "派对尖帽",
+      "slot": "head",
+      "shape": "partyHat"
+    },
+    {
+      "id": "acc_head_witch",
+      "name": "女巫帽",
+      "slot": "head",
+      "shape": "coneHat"
+    },
+    {
+      "id": "acc_neck_01_1",
+      "name": "铃铛项圈",
+      "slot": "neck",
+      "shape": "collarBell"
+    },
+    {
+      "id": "acc_neck_bell",
+      "name": "铃铛项圈",
+      "slot": "neck",
+      "shape": "collarBell"
+    },
+    {
+      "id": "acc_neck_bowtie",
+      "name": "学院领结",
+      "slot": "neck",
+      "shape": "bowtie"
+    },
+    {
+      "id": "acc_neck_plaidscarf",
+      "name": "格纹围巾",
+      "slot": "neck",
+      "shape": "scarf"
+    },
+    {
+      "id": "acc_paw_01_1",
+      "name": "小袜子",
+      "slot": "paw",
+      "shape": "sock"
+    },
+    {
+      "id": "acc_paw_boots",
+      "name": "小雨靴",
+      "slot": "paw",
+      "shape": "boot"
+    },
+    {
+      "id": "acc_paw_socks",
+      "name": "小袜子",
+      "slot": "paw",
+      "shape": "sock"
+    },
+    {
+      "id": "acc_prop_01_1",
+      "name": "小鱼干",
+      "slot": "prop",
+      "shape": "propFish"
+    },
+    {
+      "id": "acc_prop_book",
+      "name": "小书本",
+      "slot": "prop",
+      "shape": "propBook"
+    },
+    {
+      "id": "acc_prop_coffee",
+      "name": "咖啡杯",
+      "slot": "prop",
+      "shape": "propCup"
+    },
+    {
+      "id": "acc_prop_fishsnack",
+      "name": "小鱼干",
+      "slot": "prop",
+      "shape": "propFish"
+    },
+    {
+      "id": "acc_prop_umbrella",
+      "name": "小雨伞",
+      "slot": "prop",
+      "shape": "propUmbrella"
+    },
+    {
+      "id": "acc_prop_yarn",
+      "name": "毛线球",
+      "slot": "prop",
+      "shape": "propYarn"
+    },
+    {
+      "id": "acc_back_07_1",
+      "name": "双肩书包",
+      "slot": "back",
+      "shape": "backpack"
+    },
+    {
+      "id": "acc_head_01_1",
+      "name": "棒球帽",
+      "slot": "head",
+      "shape": "cap"
+    },
+    {
+      "id": "acc_head_09_1",
+      "name": "小皇冠",
+      "slot": "head",
+      "shape": "crown"
+    },
+    {
+      "id": "acc_paw_02_1",
+      "name": "小雨靴",
+      "slot": "paw",
+      "shape": "boot"
+    },
+    {
+      "id": "acc_prop_02_1",
+      "name": "咖啡杯",
+      "slot": "prop",
+      "shape": "propCup"
+    },
+    {
+      "id": "acc_back_01_1",
+      "name": "小天使翅膀",
+      "slot": "back",
+      "shape": "wingsAngel"
+    },
+    {
+      "id": "acc_back_03_1",
+      "name": "蝴蝶翅膀",
+      "slot": "back",
+      "shape": "wingsButterfly"
+    },
+    {
+      "id": "acc_face_11_1",
+      "name": "单片眼镜",
+      "slot": "face",
+      "shape": "monocle"
+    },
+    {
+      "id": "acc_face_14_1",
+      "name": "雪花贴",
+      "slot": "face",
+      "shape": "sticker"
+    },
+    {
+      "id": "acc_floor_15_1",
+      "name": "云朵垫",
+      "slot": "floor",
+      "shape": "cushion"
+    },
+    {
+      "id": "acc_neck_02_1",
+      "name": "学院领结",
+      "slot": "neck",
+      "shape": "bowtie"
+    },
+    {
+      "id": "acc_face_02_1",
+      "name": "心形墨镜",
+      "slot": "face",
+      "shape": "glassesHeart"
+    },
+    {
+      "id": "acc_face_03_1",
+      "name": "电竞护目镜",
+      "slot": "face",
+      "shape": "goggles"
+    },
+    {
+      "id": "acc_face_19_1",
+      "name": "3D 眼镜",
+      "slot": "face",
+      "shape": "glassesPixel"
+    },
+    {
+      "id": "acc_floor_11_1",
+      "name": "圆木墩",
+      "slot": "floor",
+      "shape": "cushion"
+    },
+    {
+      "id": "acc_head_12_1",
+      "name": "水手帽",
+      "slot": "head",
+      "shape": "sailorCap"
+    },
+    {
+      "id": "acc_prop_03_1",
+      "name": "小书本",
+      "slot": "prop",
+      "shape": "propBook"
+    },
+    {
+      "id": "acc_prop_04_1",
+      "name": "毛线球",
+      "slot": "prop",
+      "shape": "propYarn"
+    },
+    {
+      "id": "acc_prop_05_1",
+      "name": "小雨伞",
+      "slot": "prop",
+      "shape": "propUmbrella"
+    },
+    {
+      "id": "acc_back_06_1",
+      "name": "小背包",
+      "slot": "back",
+      "shape": "backpack"
+    },
+    {
+      "id": "acc_face_04_1",
+      "name": "单眼眼罩",
+      "slot": "face",
+      "shape": "eyePatch"
+    },
+    {
+      "id": "acc_face_05_1",
+      "name": "小口罩",
+      "slot": "face",
+      "shape": "mask"
+    },
+    {
+      "id": "acc_face_12_1",
+      "name": "潜水镜",
+      "slot": "face",
+      "shape": "goggles"
+    },
+    {
+      "id": "acc_face_13_1",
+      "name": "面纱",
+      "slot": "face",
+      "shape": "veil"
+    },
+    {
+      "id": "acc_head_07_1",
+      "name": "鹿角发箍",
+      "slot": "head",
+      "shape": "antler"
+    },
+    {
+      "id": "acc_head_08_1",
+      "name": "派对尖帽",
+      "slot": "head",
+      "shape": "partyHat"
+    },
+    {
+      "id": "acc_head_18_1",
+      "name": "牛仔帽",
+      "slot": "head",
+      "shape": "cowboyHat"
+    },
+    {
+      "id": "acc_head_19_1",
+      "name": "卫衣兜帽",
+      "slot": "head",
+      "shape": "hoodie"
+    },
+    {
+      "id": "acc_neck_03_1",
+      "name": "格纹围巾",
+      "slot": "neck",
+      "shape": "scarf"
+    },
+    {
+      "id": "acc_prop_06_1",
+      "name": "逗猫棒",
+      "slot": "prop",
+      "shape": "wand"
+    },
+    {
+      "id": "acc_prop_11_1",
+      "name": "茶杯",
+      "slot": "prop",
+      "shape": "propCup"
+    },
+    {
+      "id": "acc_prop_12_1",
+      "name": "甜甜圈",
+      "slot": "prop",
+      "shape": "donut"
+    },
+    {
+      "id": "acc_prop_13_1",
+      "name": "棒棒糖",
+      "slot": "prop",
+      "shape": "lollipop"
+    },
+    {
+      "id": "acc_prop_14_1",
+      "name": "气球",
+      "slot": "prop",
+      "shape": "balloon"
+    },
+    {
+      "id": "acc_face_06_1",
+      "name": "腮红贴",
+      "slot": "face",
+      "shape": "blush"
+    },
+    {
+      "id": "acc_face_08_1",
+      "name": "猫眼美瞳",
+      "slot": "face",
+      "shape": "eyewear"
+    },
+    {
+      "id": "acc_face_09_1",
+      "name": "星星眼贴",
+      "slot": "face",
+      "shape": "sticker"
+    },
+    {
+      "id": "acc_face_15_1",
+      "name": "泪滴贴",
+      "slot": "face",
+      "shape": "sticker"
+    },
+    {
+      "id": "acc_face_16_1",
+      "name": "猫须贴",
+      "slot": "face",
+      "shape": "whiskerSticker"
+    },
+    {
+      "id": "acc_face_17_1",
+      "name": "彩虹眼影",
+      "slot": "face",
+      "shape": "eyeshadow"
+    },
+    {
+      "id": "acc_head_02_1",
+      "name": "针织毛线帽",
+      "slot": "head",
+      "shape": "beanie"
+    },
+    {
+      "id": "acc_head_03_1",
+      "name": "女巫帽",
+      "slot": "head",
+      "shape": "coneHat"
+    },
+    {
+      "id": "acc_head_04_1",
+      "name": "厨师帽",
+      "slot": "head",
+      "shape": "chefHat"
+    },
+    {
+      "id": "acc_head_06_1",
+      "name": "猫耳发箍",
+      "slot": "head",
+      "shape": "earband"
+    },
+    {
+      "id": "acc_head_14_1",
+      "name": "兔耳发箍",
+      "slot": "head",
+      "shape": "bunnyEars"
+    },
+    {
+      "id": "acc_neck_16_1",
+      "name": "双色围巾",
+      "slot": "neck",
+      "shape": "scarf"
+    },
+    {
+      "id": "acc_paw_08_1",
+      "name": "雪地靴",
+      "slot": "paw",
+      "shape": "boot"
+    },
+    {
+      "id": "acc_paw_19_1",
+      "name": "针织腿套",
+      "slot": "paw",
+      "shape": "sock"
+    },
+    {
+      "id": "acc_prop_07_1",
+      "name": "手机",
+      "slot": "prop",
+      "shape": "phone"
+    },
+    {
+      "id": "acc_prop_08_1",
+      "name": "小键盘",
+      "slot": "prop",
+      "shape": "miniKeyboard"
+    },
+    {
+      "id": "acc_prop_09_1",
+      "name": "铅笔",
+      "slot": "prop",
+      "shape": "pencil"
+    },
+    {
+      "id": "acc_prop_15_1",
+      "name": "小鱼缸",
+      "slot": "prop",
+      "shape": "fishbowl"
+    },
+    {
+      "id": "acc_prop_16_1",
+      "name": "望远镜",
+      "slot": "prop",
+      "shape": "telescope"
+    },
+    {
+      "id": "acc_prop_18_1",
+      "name": "扳手",
+      "slot": "prop",
+      "shape": "wrench"
+    },
+    {
+      "id": "acc_prop_19_1",
+      "name": "药瓶",
+      "slot": "prop",
+      "shape": "pillBottle"
+    },
+    {
+      "id": "acc_back_02_1",
+      "name": "恶魔翅膀",
+      "slot": "back",
+      "shape": "wingsDevil"
+    },
+    {
+      "id": "acc_back_04_1",
+      "name": "蜜蜂翅膀",
+      "slot": "back",
+      "shape": "wingsBee"
+    },
+    {
+      "id": "acc_face_07_1",
+      "name": "像素墨镜",
+      "slot": "face",
+      "shape": "glassesPixel"
+    },
+    {
+      "id": "acc_head_10_1",
+      "name": "睡帽",
+      "slot": "head",
+      "shape": "nightcap"
+    },
+    {
+      "id": "acc_prop_17_1",
+      "name": "相机",
+      "slot": "prop",
+      "shape": "camera"
+    },
+    {
+      "id": "acc_back_05_1",
+      "name": "蜻蜓翅膀",
+      "slot": "back",
+      "shape": "wingsBee"
+    },
+    {
+      "id": "acc_back_09_1",
+      "name": "斗篷",
+      "slot": "back",
+      "shape": "cape"
+    },
+    {
+      "id": "acc_face_10_1",
+      "name": "半脸面具",
+      "slot": "face",
+      "shape": "mask"
+    },
+    {
+      "id": "acc_face_18_1",
+      "name": "蒸汽风镜",
+      "slot": "face",
+      "shape": "goggles"
+    },
+    {
+      "id": "acc_face_20_1",
+      "name": "眼线贴",
+      "slot": "face",
+      "shape": "eyeliner"
+    },
+    {
+      "id": "acc_neck_12_1",
+      "name": "长围巾",
+      "slot": "neck",
+      "shape": "scarf"
+    },
+    {
+      "id": "acc_paw_20_1",
+      "name": "雨鞋套",
+      "slot": "paw",
+      "shape": "boot"
+    },
+    {
+      "id": "acc_prop_10_1",
+      "name": "便签本",
+      "slot": "prop",
+      "shape": "notepad"
+    },
+    {
+      "id": "acc_prop_20_1",
+      "name": "麦克风",
+      "slot": "prop",
+      "shape": "mic"
+    }
+  ],
+  "removed": [
+    {
+      "id": "acc_back_jetpack",
+      "name": "火箭背包",
+      "slot": "back",
+      "shape": "jetpack"
+    },
+    {
+      "id": "acc_back_shell",
+      "name": "小龟壳",
+      "slot": "back",
+      "shape": "shell"
+    },
+    {
+      "id": "acc_floor_beach",
+      "name": "沙滩垫",
+      "slot": "floor",
+      "shape": "mat"
+    },
+    {
+      "id": "acc_floor_box",
+      "name": "纸箱",
+      "slot": "floor",
+      "shape": "box"
+    },
+    {
+      "id": "acc_floor_cabin",
+      "name": "小木屋",
+      "slot": "floor",
+      "shape": "cabin"
+    },
+    {
+      "id": "acc_floor_catttree",
+      "name": "猫爬架底座",
+      "slot": "floor",
+      "shape": "treeBase"
+    },
+    {
+      "id": "acc_floor_picnic",
+      "name": "野餐垫",
+      "slot": "floor",
+      "shape": "mat"
+    },
+    {
+      "id": "acc_floor_rug",
+      "name": "毛绒地毯",
+      "slot": "floor",
+      "shape": "rug"
+    },
+    {
+      "id": "acc_floor_snow",
+      "name": "雪地小坑",
+      "slot": "floor",
+      "shape": "snowPit"
+    },
+    {
+      "id": "acc_head_15_1",
+      "name": "贝雷帽",
+      "slot": "head",
+      "shape": "beret"
+    },
+    {
+      "id": "acc_head_earmuff",
+      "name": "耳罩",
+      "slot": "head",
+      "shape": "earmuff"
+    },
+    {
+      "id": "acc_head_frog",
+      "name": "青蛙头套",
+      "slot": "head",
+      "shape": "hood"
+    },
+    {
+      "id": "acc_neck_bandana",
+      "name": "三角领巾",
+      "slot": "neck",
+      "shape": "bandana"
+    },
+    {
+      "id": "acc_neck_pearl",
+      "name": "珍珠项链",
+      "slot": "neck",
+      "shape": "pearl"
+    },
+    {
+      "id": "acc_neck_raincoat",
+      "name": "小雨衣领",
+      "slot": "neck",
+      "shape": "rainCollar"
+    },
+    {
+      "id": "acc_neck_tie",
+      "name": "领带",
+      "slot": "neck",
+      "shape": "tie"
+    },
+    {
+      "id": "acc_neck_towel",
+      "name": "运动毛巾",
+      "slot": "neck",
+      "shape": "towel"
+    },
+    {
+      "id": "acc_paw_cuff",
+      "name": "爪环",
+      "slot": "paw",
+      "shape": "cuff"
+    },
+    {
+      "id": "acc_paw_slippers",
+      "name": "小拖鞋",
+      "slot": "paw",
+      "shape": "slipper"
+    },
+    {
+      "id": "acc_floor_02_1",
+      "name": "毛绒地毯",
+      "slot": "floor",
+      "shape": "rug"
+    },
+    {
+      "id": "acc_back_17_1",
+      "name": "小灯笼",
+      "slot": "back",
+      "shape": "lantern"
+    },
+    {
+      "id": "acc_back_18_1",
+      "name": "竹篓",
+      "slot": "back",
+      "shape": "basket"
+    },
+    {
+      "id": "acc_floor_03_1",
+      "name": "纸箱",
+      "slot": "floor",
+      "shape": "box"
+    },
+    {
+      "id": "acc_paw_04_1",
+      "name": "小拖鞋",
+      "slot": "paw",
+      "shape": "slipper"
+    },
+    {
+      "id": "acc_paw_09_1",
+      "name": "运动鞋",
+      "slot": "paw",
+      "shape": "sneaker"
+    },
+    {
+      "id": "acc_paw_16_1",
+      "name": "铃铛爪环",
+      "slot": "paw",
+      "shape": "cuff"
+    },
+    {
+      "id": "acc_back_11_1",
+      "name": "小龟壳",
+      "slot": "back",
+      "shape": "shell"
+    },
+    {
+      "id": "acc_back_13_1",
+      "name": "箭筒",
+      "slot": "back",
+      "shape": "flag"
+    },
+    {
+      "id": "acc_floor_13_1",
+      "name": "瓷砖地",
+      "slot": "floor",
+      "shape": "rug"
+    },
+    {
+      "id": "acc_neck_04_1",
+      "name": "领带",
+      "slot": "neck",
+      "shape": "tie"
+    },
+    {
+      "id": "acc_neck_05_1",
+      "name": "运动毛巾",
+      "slot": "neck",
+      "shape": "towel"
+    },
+    {
+      "id": "acc_neck_09_1",
+      "name": "围脖",
+      "slot": "neck",
+      "shape": "snood"
+    },
+    {
+      "id": "acc_neck_13_1",
+      "name": "防风围脖",
+      "slot": "neck",
+      "shape": "snood"
+    },
+    {
+      "id": "acc_paw_03_1",
+      "name": "爪环",
+      "slot": "paw",
+      "shape": "cuff"
+    },
+    {
+      "id": "acc_paw_11_1",
+      "name": "爪部绑带",
+      "slot": "paw",
+      "shape": "wristband"
+    },
+    {
+      "id": "acc_paw_12_1",
+      "name": "爪戒",
+      "slot": "paw",
+      "shape": "ring"
+    },
+    {
+      "id": "acc_back_14_1",
+      "name": "小吉他",
+      "slot": "back",
+      "shape": "flag"
+    },
+    {
+      "id": "acc_back_15_1",
+      "name": "小旗子",
+      "slot": "back",
+      "shape": "flag"
+    },
+    {
+      "id": "acc_floor_06_1",
+      "name": "野餐垫",
+      "slot": "floor",
+      "shape": "mat"
+    },
+    {
+      "id": "acc_floor_14_1",
+      "name": "月球表面",
+      "slot": "floor",
+      "shape": "snowPit"
+    },
+    {
+      "id": "acc_head_13_1",
+      "name": "草帽",
+      "slot": "head",
+      "shape": "sunhat"
+    },
+    {
+      "id": "acc_head_17_1",
+      "name": "花环",
+      "slot": "head",
+      "shape": "wreath"
+    },
+    {
+      "id": "acc_neck_11_1",
+      "name": "星形吊坠",
+      "slot": "neck",
+      "shape": "pendant"
+    },
+    {
+      "id": "acc_paw_13_1",
+      "name": "爪印贴纸",
+      "slot": "paw",
+      "shape": "pawSticker"
+    },
+    {
+      "id": "acc_paw_14_1",
+      "name": "拳套",
+      "slot": "paw",
+      "shape": "glove"
+    },
+    {
+      "id": "acc_back_12_1",
+      "name": "滑翔翼",
+      "slot": "back",
+      "shape": "glider"
+    },
+    {
+      "id": "acc_floor_07_1",
+      "name": "雪地小坑",
+      "slot": "floor",
+      "shape": "snowPit"
+    },
+    {
+      "id": "acc_floor_08_1",
+      "name": "沙滩垫",
+      "slot": "floor",
+      "shape": "mat"
+    },
+    {
+      "id": "acc_floor_09_1",
+      "name": "竹席",
+      "slot": "floor",
+      "shape": "mat"
+    },
+    {
+      "id": "acc_floor_16_1",
+      "name": "泡泡池",
+      "slot": "floor",
+      "shape": "snowPit"
+    },
+    {
+      "id": "acc_floor_17_1",
+      "name": "秋叶堆",
+      "slot": "floor",
+      "shape": "snowPit"
+    },
+    {
+      "id": "acc_floor_18_1",
+      "name": "草地",
+      "slot": "floor",
+      "shape": "rug"
+    },
+    {
+      "id": "acc_floor_19_1",
+      "name": "雨后水洼",
+      "slot": "floor",
+      "shape": "snowPit"
+    },
+    {
+      "id": "acc_floor_20_1",
+      "name": "星光台",
+      "slot": "floor",
+      "shape": "treeBase"
+    },
+    {
+      "id": "acc_head_05_1",
+      "name": "青蛙头套",
+      "slot": "head",
+      "shape": "hood"
+    },
+    {
+      "id": "acc_head_11_1",
+      "name": "耳罩",
+      "slot": "head",
+      "shape": "earmuff"
+    },
+    {
+      "id": "acc_neck_06_1",
+      "name": "珍珠项链",
+      "slot": "neck",
+      "shape": "pearl"
+    },
+    {
+      "id": "acc_neck_08_1",
+      "name": "三角领巾",
+      "slot": "neck",
+      "shape": "bandana"
+    },
+    {
+      "id": "acc_neck_17_1",
+      "name": "医疗颈托",
+      "slot": "neck",
+      "shape": "neckBrace"
+    },
+    {
+      "id": "acc_neck_19_1",
+      "name": "羽毛围巾",
+      "slot": "neck",
+      "shape": "furCollar"
+    },
+    {
+      "id": "acc_paw_05_1",
+      "name": "毛绒爪套",
+      "slot": "paw",
+      "shape": "plushPaw"
+    },
+    {
+      "id": "acc_paw_06_1",
+      "name": "护腕",
+      "slot": "paw",
+      "shape": "wristband"
+    },
+    {
+      "id": "acc_paw_07_1",
+      "name": "爪链",
+      "slot": "paw",
+      "shape": "cuff"
+    },
+    {
+      "id": "acc_paw_15_1",
+      "name": "溜冰鞋",
+      "slot": "paw",
+      "shape": "sneaker"
+    },
+    {
+      "id": "acc_paw_17_1",
+      "name": "脚镯",
+      "slot": "paw",
+      "shape": "ring"
+    },
+    {
+      "id": "acc_paw_18_1",
+      "name": "爪尖美甲",
+      "slot": "paw",
+      "shape": "nails"
+    },
+    {
+      "id": "acc_back_16_1",
+      "name": "降落伞",
+      "slot": "back",
+      "shape": "parachute"
+    },
+    {
+      "id": "acc_back_19_1",
+      "name": "冲浪板",
+      "slot": "back",
+      "shape": "surfboard"
+    },
+    {
+      "id": "acc_back_20_1",
+      "name": "气球束",
+      "slot": "back",
+      "shape": "balloons"
+    },
+    {
+      "id": "acc_head_16_1",
+      "name": "骑士头盔",
+      "slot": "head",
+      "shape": "helmet"
+    },
+    {
+      "id": "acc_head_20_1",
+      "name": "南瓜帽",
+      "slot": "head",
+      "shape": "pumpkin"
+    },
+    {
+      "id": "acc_neck_07_1",
+      "name": "小雨衣领",
+      "slot": "neck",
+      "shape": "rainCollar"
+    },
+    {
+      "id": "acc_neck_14_1",
+      "name": "蕾丝领",
+      "slot": "neck",
+      "shape": "laceCollar"
+    },
+    {
+      "id": "acc_neck_15_1",
+      "name": "铭牌项圈",
+      "slot": "neck",
+      "shape": "nameTag"
+    },
+    {
+      "id": "acc_neck_18_1",
+      "name": "蕾丝颈环",
+      "slot": "neck",
+      "shape": "laceCollar"
+    },
+    {
+      "id": "acc_neck_20_1",
+      "name": "围兜",
+      "slot": "neck",
+      "shape": "bib"
+    },
+    {
+      "id": "acc_back_10_1",
+      "name": "火箭背包",
+      "slot": "back",
+      "shape": "jetpack"
+    },
+    {
+      "id": "acc_floor_04_1",
+      "name": "猫爬架底座",
+      "slot": "floor",
+      "shape": "treeBase"
+    },
+    {
+      "id": "acc_floor_05_1",
+      "name": "小木屋",
+      "slot": "floor",
+      "shape": "cabin"
+    },
+    {
+      "id": "acc_floor_10_1",
+      "name": "榻榻米",
+      "slot": "floor",
+      "shape": "mat"
+    },
+    {
+      "id": "acc_floor_12_1",
+      "name": "波斯小毯",
+      "slot": "floor",
+      "shape": "rug"
+    },
+    {
+      "id": "acc_neck_10_1",
+      "name": "毛领",
+      "slot": "neck",
+      "shape": "furCollar"
+    },
+    {
+      "id": "acc_paw_10_1",
+      "name": "洞洞鞋",
+      "slot": "paw",
+      "shape": "slipper"
+    }
+  ],
+  "keptFx": 350
+}

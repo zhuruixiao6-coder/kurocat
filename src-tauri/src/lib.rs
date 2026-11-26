@@ -2,13 +2,17 @@
 
 mod cats;
 mod config;
+mod custom_sounds;
 mod game_detect;
 mod input_hook;
+mod macos_perms;
 #[cfg(target_os = "macos")]
 mod macos_window;
 mod mcp;
 mod obs;
 mod privacy;
+mod profile;
+mod shop_table;
 mod tray;
 mod updater;
 #[cfg(windows)]
@@ -241,6 +245,8 @@ pub fn set_pet_always_on_top(app: &AppHandle, on_top: bool) {
 }
 
 pub fn shutdown_pet_windows() {
+    // 退出前把敲击进度立刻落盘，保证「重启后进度不丢」。
+    profile::flush_now();
     obs::shutdown_obs_server();
     #[cfg(windows)]
     if win_needs_win7_ulw() {
@@ -340,6 +346,9 @@ fn update_settings(app: AppHandle, state: State<'_, AppState>, mut patch: AppSet
     patch.render_mode = config::normalize_render_mode(&patch.render_mode);
     patch.collar_color = config::normalize_collar_color(&patch.collar_color);
     patch.headphone_mode = config::normalize_headphone_mode(&patch.headphone_mode);
+    patch.key_sound_volume = patch.key_sound_volume.min(100);
+    patch.key_sound_style = config::normalize_key_sound_style(&patch.key_sound_style);
+    patch.key_sound_pack = config::normalize_key_sound_pack(&patch.key_sound_pack);
 
     let (prev_autostart, prev_scale, prev_layout, prev_obs_hide) = {
         let s = state.settings.lock().unwrap();
@@ -666,6 +675,81 @@ fn preview_scale(app: AppHandle, scale: f64) {
 }
 
 #[tauri::command]
+fn preview_key_sound(app: AppHandle, style: String) {
+    let normalized = config::normalize_key_sound_style(&style);
+    let _ = app.emit("kuro-keysound-preview", normalized);
+}
+
+#[tauri::command]
+fn get_profile() -> profile::Profile {
+    profile::snapshot()
+}
+
+#[tauri::command]
+fn get_shop() -> Vec<profile::ShopItem> {
+    profile::SHOP.to_vec()
+}
+
+#[tauri::command]
+fn buy_shop_item(app: AppHandle, id: String) -> Result<profile::Profile, String> {
+    profile::buy(&app, &id)
+}
+
+#[tauri::command]
+fn equip_shop_item(app: AppHandle, id: String) -> Result<profile::Profile, String> {
+    profile::equip(&app, &id)
+}
+
+#[tauri::command]
+fn unequip_shop_slot(app: AppHandle, slot: String) -> Result<profile::Profile, String> {
+    profile::unequip(&app, &slot)
+}
+
+#[tauri::command]
+fn set_bubble_enabled(app: AppHandle, enabled: bool) -> profile::Profile {
+    profile::set_bubble(&app, enabled)
+}
+
+#[tauri::command]
+fn grant_fish(app: AppHandle, amount: u64) -> Result<profile::Profile, String> {
+    profile::add_fish(&app, amount)
+}
+
+#[tauri::command]
+fn open_custom_sound_dir() -> Result<String, String> {
+    custom_sounds::open_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn list_custom_packs() -> Vec<custom_sounds::PackInfo> {
+    custom_sounds::list_packs()
+}
+
+#[tauri::command]
+fn load_custom_pack(name: String) -> Result<custom_sounds::PackData, String> {
+    custom_sounds::load_pack(&name)
+}
+
+#[tauri::command]
+fn custom_sounds_signature() -> String {
+    custom_sounds::signature()
+}
+
+#[tauri::command]
+fn custom_sound_count() -> usize {
+    custom_sounds::pack_count()
+}
+
+/// Tells the pet window to reload the user sound folder right now.
+#[tauri::command]
+fn rescan_custom_sounds(app: AppHandle) -> usize {
+    let _ = app.emit("kuro-custom-sounds-reload", ());
+    custom_sounds::pack_count()
+}
+
+#[tauri::command]
 fn get_obs_url(state: State<'_, AppState>) -> String {
     let port = state.settings.lock().unwrap().obs_port;
     obs::obs_url(port)
@@ -838,6 +922,93 @@ async fn start_pet_drag(app: AppHandle) -> bool {
 #[tauri::command]
 fn set_update_banner_open(state: State<'_, AppState>, open: bool) {
     state.update_banner_open.store(open, Ordering::Relaxed);
+}
+
+
+/// 读取自定义毛色贴图 `%APPDATA%\kuro-cat-pet\skins\orange-bib-coat.png`，返回 data URL
+
+/// 自定义键盘目录（%APPDATA%\kuro-cat-pet\keyboards），返回所有 .json 预设
+#[tauri::command]
+fn list_keyboard_presets() -> Vec<serde_json::Value> {
+    let dir = crate::config::app_data_dir().join("keyboards");
+    let _ = std::fs::create_dir_all(&dir);
+    let mut out = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(&dir) {
+        for entry in rd.flatten() {
+            let path = entry.path();
+            if !path
+                .extension()
+                .and_then(|s| s.to_str())
+                .map(|s| s.eq_ignore_ascii_case("json"))
+                .unwrap_or(false)
+            {
+                continue;
+            }
+            let Ok(txt) = std::fs::read_to_string(&path) else { continue };
+            let Ok(mut v) = serde_json::from_str::<serde_json::Value>(&txt) else { continue };
+            if let Some(obj) = v.as_object_mut() {
+                let stem = path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or_default()
+                    .to_string();
+                obj.entry("id").or_insert(serde_json::Value::String(stem));
+            }
+            out.push(v);
+        }
+    }
+    out
+}
+
+#[tauri::command]
+fn open_keyboard_folder() -> Result<(), String> {
+    let dir = crate::config::app_data_dir().join("keyboards");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    #[cfg(windows)]
+    {
+        std::process::Command::new("explorer")
+            .arg(&dir)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+
+#[tauri::command]
+fn macos_permission_status() -> macos_perms::MacPerms {
+    macos_perms::check()
+}
+
+#[tauri::command]
+fn macos_open_permission_settings(kind: String) {
+    macos_perms::open_settings(&kind);
+}
+
+#[tauri::command]
+fn restart_app(app: tauri::AppHandle) {
+    app.restart();
+}
+
+#[tauri::command]
+fn get_coat_image() -> Option<String> {
+    let path = crate::config::app_data_dir()
+        .join("skins")
+        .join("orange-bib-coat.png");
+    let bytes = std::fs::read(path).ok()?;
+    const T: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(bytes.len() * 4 / 3 + 8);
+    for chunk in bytes.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = *chunk.get(1).unwrap_or(&0) as u32;
+        let b2 = *chunk.get(2).unwrap_or(&0) as u32;
+        let n = (b0 << 16) | (b1 << 8) | b2;
+        out.push(T[((n >> 18) & 63) as usize] as char);
+        out.push(T[((n >> 12) & 63) as usize] as char);
+        out.push(if chunk.len() > 1 { T[((n >> 6) & 63) as usize] as char } else { '=' });
+        out.push(if chunk.len() > 2 { T[(n & 63) as usize] as char } else { '=' });
+    }
+    Some(format!("data:image/png;base64,{out}"))
 }
 
 #[tauri::command]
@@ -1465,6 +1636,107 @@ pub fn win_is_elevated() -> bool {
         let _ = CloseHandle(token);
         ok != 0 && elevation.token_is_elevated != 0
     }
+}
+
+/// 前台窗口所属进程是否以管理员身份运行。
+///
+/// 这是「游戏里宠物还在置顶，但敲键盘没反应」最常见的原因：
+/// 非提权进程装的低级键盘钩子收不到高完整性级别进程（管理员运行的游戏）的按键。
+#[cfg(windows)]
+pub fn win_foreground_is_elevated() -> bool {
+    use std::ffi::c_void;
+    use windows_sys::Win32::Foundation::{BOOL, CloseHandle, HANDLE};
+    use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
+
+    #[link(name = "advapi32")]
+    extern "system" {
+        fn OpenProcessToken(
+            process_handle: HANDLE,
+            desired_access: u32,
+            token_handle: *mut HANDLE,
+        ) -> BOOL;
+        fn GetTokenInformation(
+            token_handle: HANDLE,
+            token_information_class: u32,
+            token_information: *mut c_void,
+            token_information_length: u32,
+            return_length: *mut u32,
+        ) -> BOOL;
+    }
+
+    const TOKEN_QUERY: u32 = 0x0008;
+    const TOKEN_ELEVATION_CLASS: u32 = 20;
+
+    #[repr(C)]
+    struct TokenElevation {
+        token_is_elevated: u32,
+    }
+
+    unsafe {
+        let hwnd = GetForegroundWindow();
+        if hwnd.is_null() {
+            return false;
+        }
+        let mut pid: u32 = 0;
+        GetWindowThreadProcessId(hwnd, &mut pid);
+        if pid == 0 {
+            return false;
+        }
+        let proc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+        if proc.is_null() {
+            return false;
+        }
+        let mut token: HANDLE = std::ptr::null_mut();
+        let mut elevated = false;
+        if OpenProcessToken(proc, TOKEN_QUERY, &mut token) != 0 && !token.is_null() {
+            let mut info = TokenElevation {
+                token_is_elevated: 0,
+            };
+            let mut ret_len: u32 = 0;
+            let ok = GetTokenInformation(
+                token,
+                TOKEN_ELEVATION_CLASS,
+                (&mut info as *mut TokenElevation).cast(),
+                std::mem::size_of::<TokenElevation>() as u32,
+                &mut ret_len,
+            );
+            elevated = ok != 0 && info.token_is_elevated != 0;
+            let _ = CloseHandle(token);
+        }
+        let _ = CloseHandle(proc);
+        elevated
+    }
+}
+
+#[cfg(not(windows))]
+pub fn win_foreground_is_elevated() -> bool {
+    false
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ElevationStatus {
+    /// 本程序是否已提权
+    pub self_elevated: bool,
+    /// 当前前台程序是否已提权（管理员运行的游戏）
+    pub foreground_elevated: bool,
+}
+
+#[tauri::command]
+fn elevation_status() -> ElevationStatus {
+    ElevationStatus {
+        self_elevated: if cfg!(windows) { win_is_elevated() } else { true },
+        foreground_elevated: win_foreground_is_elevated(),
+    }
+}
+
+#[tauri::command]
+fn restart_as_admin(app: AppHandle) {
+    #[cfg(windows)]
+    win_restart_as_admin(app);
+    #[cfg(not(windows))]
+    let _ = app;
 }
 
 #[cfg(windows)]
@@ -2461,11 +2733,33 @@ pub fn run() {
             get_mcp_config,
             get_obs_url,
             get_app_version,
+            get_coat_image,
+            macos_permission_status,
+            macos_open_permission_settings,
+            restart_app,
+            list_keyboard_presets,
+            open_keyboard_folder,
             update_settings,
             open_context_menu,
             close_context_menu,
             open_tail_picker_from_menu,
             preview_scale,
+            preview_key_sound,
+            get_profile,
+            get_shop,
+            buy_shop_item,
+            equip_shop_item,
+            unequip_shop_slot,
+            set_bubble_enabled,
+            grant_fish,
+            open_custom_sound_dir,
+            elevation_status,
+            restart_as_admin,
+            list_custom_packs,
+            load_custom_pack,
+            custom_sounds_signature,
+            custom_sound_count,
+            rescan_custom_sounds,
             set_menu_open,
             set_tail_picker_bounds,
             save_tail_picker_selection,

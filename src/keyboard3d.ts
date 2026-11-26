@@ -283,12 +283,27 @@ const miscTextureCache = new Map<string, THREE.CanvasTexture>();
  * CanvasTexture atlas (128x128 per tile with 2px inner bleed padding), collapsing 67-108 separate
  * keycap textures and 201-324 draw calls into just 2 InstancedMesh draw calls total!
  */
+interface KbAtlasPalette {
+  alpha: string;
+  mod: string;
+  accent: string;
+  textAlpha: string;
+  textDark: string;
+}
+
 function getKeycapAtlas(
   layoutId: KeyboardLayoutId,
   keys: readonly KeySpec[],
   rotated180: boolean,
+  rog = false,
+  pal?: KbAtlasPalette,
 ): KeyAtlasData {
-  const cacheKey = `${layoutId}|${rotated180 ? 1 : 0}`;
+  const p: KbAtlasPalette =
+    pal ??
+    (rog
+      ? { alpha: '#f4f5f7', mod: '#17191f', accent: '#6a5ae0', textAlpha: '#2b2d34', textDark: '#f2f3f5' }
+      : { alpha: '#f9f8f3', mod: '#e6e4db', accent: '#f59b2e', textAlpha: '#2b2d34', textDark: '#2b2d34' });
+  const cacheKey = `${layoutId}|${rotated180 ? 1 : 0}|${p.alpha}|${p.mod}|${p.accent}|${p.textAlpha}|${p.textDark}`;
   const cached = keyAtlasCache.get(cacheKey);
   if (cached) return cached;
 
@@ -335,7 +350,7 @@ function getKeycapAtlas(
     const oy = row * CELL;
 
     g.fillStyle =
-      item.accent === 'orange' ? '#f59b2e' : item.accent === 'mod' ? '#e6e4db' : '#f9f8f3';
+      item.accent === 'orange' ? p.accent : item.accent === 'mod' ? p.mod : p.alpha;
     g.fillRect(ox, oy, CELL, CELL);
 
     // Sculpted concave PBT keycap sheen
@@ -352,7 +367,7 @@ function getKeycapAtlas(
       const len = item.label.length;
       const fontSize = len >= 4 ? 29 : len === 3 ? 35 : len === 2 ? 42 : 52;
       g.font = `700 ${fontSize}px "Segoe UI", system-ui, sans-serif`;
-      g.fillStyle = item.accent === 'orange' ? '#ffffff' : '#2b2d34';
+      g.fillStyle = item.accent === 'orange' ? '#ffffff' : item.accent === 'mod' ? p.textDark : p.textAlpha;
       g.textAlign = 'center';
       g.textBaseline = 'middle';
       g.fillText(item.label, 0, 2);
@@ -512,6 +527,20 @@ function createInstancedKeyTopMaterial(atlasTex: THREE.CanvasTexture): THREE.Sha
  * - Slightly canted matte-charcoal mechanical keyboard rendered with 2 InstancedMeshes + 1 Texture Atlas
  * - Cordless oval split-plate L/R mini mouse with engraved L/R & dual-color highlight
  */
+export interface KbPreset {
+  id?: string;
+  name?: string;
+  case?: string;
+  bezel?: string;
+  plate?: string;
+  alpha?: string;
+  mod?: string;
+  accent?: string;
+  legendAlpha?: string;
+  legendDark?: string;
+  screen?: boolean;
+}
+
 export class KeyboardAndMouse3D {
   public readonly boardGroup = new THREE.Group();
   public readonly mouseGroup = new THREE.Group();
@@ -538,6 +567,7 @@ export class KeyboardAndMouse3D {
   private boardDisposables: Array<{ dispose(): void }> = [];
 
   private layoutId: KeyboardLayoutId = '65';
+  private preset: KbPreset | null = null;
   private orientation: KeyboardOrientation = 'cat';
   private hitColor = new THREE.Color('#d4f044');
   private rightBtnColor = new THREE.Color('#ff7b3b');
@@ -765,6 +795,13 @@ export class KeyboardAndMouse3D {
     this.rebuildBoard('65', 'cat');
   }
 
+  /** 应用自定义键盘配色（来自 %APPDATA%\kuro-cat-pet\keyboards\*.json） */
+  public setPreset(p: KbPreset | null): void {
+    this.preset = p;
+    this.sideInstanced = null; // 强制重建
+    this.rebuildBoard(this.layoutId, this.orientation);
+  }
+
   public setAccentColors(primaryHex: string, rightHex: string): void {
     this.hitColor.set(primaryHex);
     this.rightBtnColor.set(rightHex);
@@ -800,7 +837,14 @@ export class KeyboardAndMouse3D {
 
     const layout = getKeyboardLayout(layoutId);
     const is108 = layoutId === '108';
+    const isRog = layoutId === '75';
     const isCatFacing = orientation === 'cat';
+
+    // 配色优先级：自定义预设 > ROG 75 默认 > 原版奶油色
+    const pal = this.preset;
+    this.sideColorBase.set(pal?.alpha ?? (isRog ? '#f4f5f7' : '#dad7cd'));
+    this.sideColorMod.set(pal?.mod ?? (isRog ? '#17191f' : '#c4c0b4'));
+    this.sideColorOrange.set(pal?.accent ?? (isRog ? '#6a5ae0' : '#c4741a'));
 
     // Sync mouse orientation (180° cat-facing vs 0° viewer-facing)
     this.mouseShape.rotation.y = isCatFacing ? -0.10 : Math.PI - 0.10;
@@ -809,13 +853,13 @@ export class KeyboardAndMouse3D {
     this.mouseLabelLMat.needsUpdate = true;
     this.mouseLabelRMat.needsUpdate = true;
 
-    const U = is108 ? 0.122 : 0.150;
+    const U = is108 ? 0.122 : isRog ? 0.132 : 0.150;
     const CAP = U * 0.87;
     const W = layout.totalUnits * U + 0.14;
     const D = layout.totalRows * U + 0.14;
     this.boardWidth = W;
     this.boardH = 0.112;
-    this.capH = is108 ? 0.048 : 0.056;
+    this.capH = is108 ? 0.048 : isRog ? 0.050 : 0.056;
 
     this.boardGroup.position.set(0.24, 0.015, 1.08);
     this.mouseHome.set(is108 ? -1.46 : -1.16, 0.015, 0.96);
@@ -832,9 +876,9 @@ export class KeyboardAndMouse3D {
     const bezelGeo = makeRoundedSlabGeo(W - 0.014, D - 0.014, 0.014, 0.060, this.boardH - 0.008);
     const plateGeo = makeRoundedSlabGeo(W - 0.062, D - 0.062, 0.008, 0.044, this.boardH + 0.004);
     const chassisGeo = mergeStaticGeometries([
-      { geo: baseGeo, color: '#202229' },
-      { geo: bezelGeo, color: '#2c2f38' },
-      { geo: plateGeo, color: '#181a20' },
+      { geo: baseGeo, color: pal?.case ?? (isRog ? '#e4e7ec' : '#202229') },
+      { geo: bezelGeo, color: pal?.bezel ?? (isRog ? '#f7f8fa' : '#2c2f38') },
+      { geo: plateGeo, color: pal?.plate ?? (isRog ? '#cfd4db' : '#181a20') },
     ]);
     baseGeo.dispose();
     bezelGeo.dispose();
@@ -843,9 +887,78 @@ export class KeyboardAndMouse3D {
     this.boardDisposables.push(chassisGeo);
     this.boardGroup.add(kbShadow, chassisMesh);
 
+    // ROG 75% 右上角的屏幕 + 旋钮（参考图那块深色小面板）
+    if (pal?.screen ?? isRog) {
+      const sw = 3.35 * U;
+      const sd = 1.02 * U;
+      const su = 14.9;
+      const sxc = isCatFacing ? layout.totalUnits - su : su;
+      const px = (sxc - layout.totalUnits * 0.5) * U;
+      // 行也要跟着翻转，否则「面向猫咪」时屏幕会跑到键帽下面
+      const sr = isCatFacing ? layout.totalRows - 0.5 : 0.5;
+      const pz = (sr - layout.totalRows * 0.5) * U;
+
+      // 银色边框 + 深色屏
+      const frameGeo = makeRoundedSlabGeo(sw + 0.03, sd + 0.03, 0.030, 0.03, this.boardH + 0.004);
+      const frameMat = new THREE.MeshBasicMaterial({ color: '#cfd4db' });
+      const frame = new THREE.Mesh(frameGeo, frameMat);
+      frame.position.set(px, 0, pz);
+      this.boardGroup.add(frame);
+
+      const panelGeo = makeRoundedSlabGeo(sw, sd, 0.024, 0.024, this.boardH + 0.014);
+      const panelMat = new THREE.MeshBasicMaterial({ color: '#0b0c10' });
+      const panel = new THREE.Mesh(panelGeo, panelMat);
+      panel.position.set(px, 0, pz);
+      this.boardGroup.add(panel);
+
+      // 屏幕内容：紫色小徽标 + KURO 字样
+      const scr = document.createElement('canvas');
+      scr.width = 256;
+      scr.height = 80;
+      const sc = scr.getContext('2d')!;
+      sc.fillStyle = '#0b0c10';
+      sc.fillRect(0, 0, 256, 80);
+      sc.strokeStyle = '#7a63ff';
+      sc.lineWidth = 3;
+      sc.beginPath();
+      sc.arc(40, 40, 17, Math.PI * 0.15, Math.PI * 1.85);
+      sc.stroke();
+      sc.fillStyle = '#b39dff';
+      sc.beginPath();
+      sc.arc(40, 40, 6, 0, Math.PI * 2);
+      sc.fill();
+      sc.fillStyle = '#e8e2ff';
+      sc.font = '700 26px "Segoe UI", sans-serif';
+      sc.fillText('KURO', 78, 50);
+      sc.fillStyle = '#7a63ff';
+      sc.fillRect(78, 60, 96, 3);
+      const scrTex = new THREE.CanvasTexture(scr);
+      scrTex.colorSpace = THREE.SRGBColorSpace;
+      const scrMat = new THREE.MeshBasicMaterial({ map: scrTex });
+      const scrGeo = new THREE.PlaneGeometry(sw * 0.86, sd * 0.62);
+      const scrMesh = new THREE.Mesh(scrGeo, scrMat);
+      scrMesh.rotation.x = -Math.PI / 2;
+      scrMesh.position.set(px - sw * 0.02, this.boardH + 0.040, pz);
+      this.boardGroup.add(scrMesh);
+      this.boardDisposables.push(frameGeo, frameMat, panelGeo, panelMat, scrGeo, scrMat, scrTex);
+
+      const knobGeo = new THREE.CylinderGeometry(0.070, 0.078, 0.055, 22);
+      const knobMat = new THREE.MeshBasicMaterial({ color: '#cfd4db' });
+      const knob = new THREE.Mesh(knobGeo, knobMat);
+      knob.position.set(px + sw * 0.5 + 0.035, this.boardH + 0.052, pz);
+      this.boardGroup.add(knob);
+      this.boardDisposables.push(knobGeo, knobMat);
+    }
+
     // Single Texture Atlas + 2 InstancedMeshes for ALL 67 or 108 keycaps (2 draw calls total!)
     const keyCount = layout.keys.length;
-    const atlas = getKeycapAtlas(layoutId, layout.keys, isCatFacing);
+    const atlas = getKeycapAtlas(layoutId, layout.keys, isCatFacing, isRog, {
+      alpha: pal?.alpha ?? (isRog ? '#f4f5f7' : '#f9f8f3'),
+      mod: pal?.mod ?? (isRog ? '#17191f' : '#e6e4db'),
+      accent: pal?.accent ?? (isRog ? '#6a5ae0' : '#f59b2e'),
+      textAlpha: pal?.legendAlpha ?? '#2b2d34',
+      textDark: pal?.legendDark ?? (isRog ? '#f2f3f5' : '#2b2d34'),
+    });
 
     const sideInst = new THREE.InstancedMesh(this.capSideGeo, this.capSideMat, keyCount);
     sideInst.frustumCulled = false;

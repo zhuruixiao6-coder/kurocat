@@ -12,7 +12,7 @@ body {
   height: 100%;
   overflow: hidden;
   background: transparent !important;
-  font-family: "Segoe UI", "Microsoft YaHei UI", system-ui, -apple-system, sans-serif;
+  font-family: "Segoe UI", "Microsoft YaHei UI", -apple-system, "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif;
 }
 
 /* On Windows 7/8 ULW mode, the cat renders via native 256-level UpdateLayeredWindow while
@@ -33,12 +33,24 @@ html.win7-ulw-mode .tail-picker-bar {
 #pet-canvas,
 #pet-canvas-3d {
   display: block;
+  position: relative;
+  z-index: 2;
   width: 100vw;
   height: 100vh;
   background: transparent;
 }
 
+.acc-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
 #pet-canvas.hidden,
+.acc-canvas.hidden,
 #pet-canvas-3d.hidden,
 .menu-scale-row.hidden {
   display: none !important;
@@ -193,18 +205,28 @@ html.win7-ulw-mode #collar-row {
 .breed-pills {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 5px;
-  max-height: 132px;
-  overflow-y: auto;
+  /* 行高锁死，避免容器高度受限时 grid 自动压缩行把文字挤扁 */
+  grid-auto-rows: minmax(30px, auto);
+  align-content: start;
+  gap: 7px;
+  /* 不再自己滚动，交给整个面板统一滚动，行距才不会被压 */
+  max-height: none;
+  overflow: visible;
+  flex-shrink: 0;
 }
 
 .breed-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.05);
   color: #e5e7eb;
-  border-radius: 7px;
-  padding: 5px 4px;
-  font-size: 11.5px;
+  border-radius: 8px;
+  padding: 7px 8px;
+  font-size: 12px;
+  line-height: 1.25;
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
@@ -250,6 +272,120 @@ html.win7-ulw-mode #collar-row {
   display: flex;
   flex-direction: column;
   gap: 3px;
+}
+
+/* Typing-sound settings block (style pills + volume slider) */
+.keysound-pills {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 7px;
+}
+
+.keysound-pills .kb-pill {
+  font-size: 10.5px;
+  padding: 4.5px 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.keysound-preview {
+  grid-column: span 3;
+  color: #c8f538;
+  border-color: rgba(200, 245, 56, 0.42);
+}
+
+.keysound-pills .kb-pill[data-keysoundstyle='custom'] {
+  grid-column: span 2;
+}
+
+.keysound-pack-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.keysound-pack-label {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  color: #9ca3af;
+}
+
+.keysound-pack-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 22px;
+  padding: 0 4px;
+  font-size: 10.5px;
+  color: #e5e7eb;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  outline: none;
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+
+.keysound-pack-select:hover,
+.keysound-pack-select:focus {
+  border-color: rgba(200, 245, 56, 0.45);
+}
+
+.keysound-pack-select option {
+  background: #1b1d21;
+  color: #e5e7eb;
+}
+
+.keysound-custom-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.keysound-custom-btn {
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e5e7eb;
+  border-radius: 6px;
+  padding: 4.5px 8px;
+  font-size: 10.5px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.keysound-custom-btn:hover {
+  background: rgba(200, 245, 56, 0.18);
+  border-color: rgba(200, 245, 56, 0.45);
+}
+
+.keysound-custom-hint {
+  flex: 1 1 100%;
+  font-size: 10px;
+  line-height: 1.35;
+  color: #7d848f;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.keysound-custom-hint.ok {
+  color: #a9e05a;
+}
+
+.keysound-custom-hint.warn {
+  color: #f0b95a;
+}
+
+.menu-scale-row.keysound-off {
+  opacity: 0.42;
+  filter: saturate(0.6);
+}
+
+.menu-scale-row.keysound-off .keysound-preview {
+  opacity: 1;
 }
 
 .scale-slider {
@@ -804,7 +940,7 @@ html.win7-ulw-mode .floating-side-menu {
 
 .menu-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(4, 1fr);
   gap: 4px;
   padding: 3px;
   margin: 2px 2px 6px;
@@ -929,3 +1065,528 @@ html.win7-ulw-mode .floating-side-menu {
 .footer-btn.danger:hover {
   background: rgba(255, 92, 92, 0.18);
 }
+
+/* ---------- 头顶小鱼干气泡 ---------- */
+.fish-bubble {
+  position: fixed;
+  top: 2px;
+  left: 50%;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 11px;
+  border-radius: 11px;
+  background: rgba(26, 28, 34, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #e7e9ee;
+  font-size: 11.5px;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -5px) scale(0.96);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.34);
+}
+
+.fish-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  margin-left: -4.5px;
+  background: rgba(26, 28, 34, 0.94);
+  border-right: 1px solid rgba(255, 255, 255, 0.14);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  transform: rotate(45deg);
+}
+
+.fish-bubble.show {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+}
+
+.fish-bubble.pop {
+  animation: fish-bubble-pop 0.32s ease;
+}
+
+.fish-bubble b {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #c8f538;
+}
+
+.fish-bubble-divider {
+  width: 1px;
+  height: 11px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.fish-bubble-fish {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+@keyframes fish-bubble-pop {
+  0% { transform: translate(-50%, 0) scale(1); }
+  38% { transform: translate(-50%, -2px) scale(1.04); }
+  100% { transform: translate(-50%, 0) scale(1); }
+}
+
+html.win7-ulw-mode .fish-bubble {
+  background: #14161c;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+html.win7-ulw-mode .fish-bubble::after {
+  background: #14161c;
+}
+
+/* ---------- 小鱼干商店 ---------- */
+.shop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px 5px;
+  flex-shrink: 0;
+}
+
+.shop-balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #9aa0aa;
+}
+
+.shop-balance b {
+  font-size: 15px;
+  font-weight: 700;
+  color: #c8f538;
+  font-variant-numeric: tabular-nums;
+}
+
+.shop-balance-unit {
+  font-size: 10.5px;
+}
+
+.shop-rate {
+  font-size: 10px;
+  color: #7d848f;
+  white-space: nowrap;
+}
+
+.shop-rate.flash {
+  color: #c8f538;
+}
+
+.shop-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 3px 10px 8px;
+}
+
+.acc-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(12, 14, 18, 0.72);
+  backdrop-filter: blur(3px);
+}
+
+.acc-modal.hidden {
+  display: none !important;
+}
+
+.acc-card {
+  position: relative;
+  width: 216px;
+  padding: 12px 12px 14px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #24272e, #1b1e24);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.acc-big {
+  width: 180px;
+  height: 180px;
+  border-radius: 12px;
+  background: radial-gradient(circle at 50% 62%, rgba(120, 160, 200, 0.18), rgba(20, 24, 30, 0.9) 72%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.acc-big img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.acc-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f2f4f8;
+}
+
+.acc-sub {
+  font-size: 10.5px;
+  color: #9aa3b0;
+}
+
+.acc-desc {
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: #b6bec9;
+  text-align: center;
+  max-height: 42px;
+  overflow: hidden;
+}
+
+.acc-act {
+  margin-top: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: none;
+  background: #c8f538;
+  color: #1b1c20;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.acc-act.owned {
+  background: rgba(200, 245, 56, 0.16);
+  color: #c8f538;
+  border: 1px solid rgba(200, 245, 56, 0.4);
+}
+
+.acc-act:disabled {
+  background: rgba(255, 255, 255, 0.1);
+  color: #8b93a0;
+  cursor: default;
+}
+
+.acc-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  border: none;
+  background: transparent;
+  color: #8b93a0;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.admin-hint {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 9px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 170, 80, 0.45);
+  background: rgba(255, 150, 60, 0.12);
+  cursor: pointer;
+}
+
+.admin-hint.hidden {
+  display: none !important;
+}
+
+.admin-hint .menu-scale-label {
+  color: #ffcf9a;
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.admin-hint-btn {
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffb765;
+}
+
+.admin-hint:hover {
+  background: rgba(255, 150, 60, 0.2);
+}
+
+.shop-week {
+  margin: 2px 0 6px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: rgba(200, 245, 56, 0.08);
+  border: 1px solid rgba(200, 245, 56, 0.18);
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: #cfe98a;
+}
+
+.owned-search {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 2px 0 7px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e8ebf0;
+  font-size: 12px;
+  outline: none;
+}
+
+.owned-search:focus {
+  border-color: rgba(200, 245, 56, 0.55);
+  background: rgba(200, 245, 56, 0.06);
+}
+
+.shop-shot {
+  display: block;
+  position: relative;
+  width: 100%;
+  height: 62px;
+  border-radius: 9px;
+  background: radial-gradient(circle at 50% 62%, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.02) 70%);
+  overflow: hidden;
+}
+
+.shop-zoom {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  font-size: 10px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.55);
+  font-style: normal;
+  pointer-events: none;
+}
+
+.shop-shot:hover .shop-zoom {
+  color: #c8f538;
+}
+
+.shop-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.shop-shot:not(.ready)::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.08) 50%, transparent 70%);
+  animation: shotShimmer 1.1s infinite linear;
+}
+
+@keyframes shotShimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+.shop-rarity {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.shop-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 2px 0 8px;
+}
+
+.shop-filter {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #b9bec7;
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 10.5px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+}
+
+.shop-filter.active {
+  background: #c8f538;
+  border-color: #c8f538;
+  color: #1b1c20;
+  font-weight: 600;
+}
+
+.shop-filter-all {
+  border-color: rgba(200, 245, 56, 0.35);
+  color: #cfe98a;
+}
+
+.shop-card.locked {
+  opacity: 0.62;
+}
+
+.shop-status.locked {
+  color: #cfa86b;
+}
+
+.shop-empty {
+  grid-column: 1 / -1;
+  padding: 18px 4px;
+  text-align: center;
+  font-size: 11.5px;
+  color: #8f949e;
+}
+
+.shop-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 9px;
+  padding: 7px 8px 6px;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  transition: background 0.14s ease, border-color 0.14s ease, transform 0.1s ease;
+}
+
+.shop-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.shop-card:active {
+  transform: scale(0.984);
+}
+
+.shop-card.equipped {
+  border-color: rgba(200, 245, 56, 0.45);
+  background: #23261c;
+}
+
+.shop-card.poor {
+  opacity: 0.78;
+}
+
+.shop-icon {
+  display: block;
+  color: #b9bec7;
+  height: 18px;
+}
+
+.shop-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.shop-card.equipped .shop-icon {
+  color: #c8f538;
+}
+
+.shop-name {
+  font-size: 11.5px;
+  color: #e6e8ec;
+  margin-top: 4px;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shop-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px;
+  width: 100%;
+  margin-top: 1px;
+}
+
+.shop-price {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #c8f538;
+  font-variant-numeric: tabular-nums;
+}
+
+.shop-price.owned {
+  color: #8b919b;
+}
+
+.shop-status {
+  font-size: 9.5px;
+  color: #8b919b;
+  white-space: nowrap;
+}
+
+.shop-status.equipped {
+  color: #c8f538;
+}
+
+.shop-status.poor {
+  color: #6f757f;
+}
+
+.shop-tip {
+  padding: 0 10px 10px;
+  font-size: 10px;
+  line-height: 1.45;
+  color: #7d848f;
+}
+
+
+/* macOS 权限提示条：只在缺权限时出现，浮在宠物上方 */
+.perm-banner {
+  position: fixed;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: rgba(28, 30, 36, 0.94);
+  border: 1px solid rgba(255, 196, 74, 0.45);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  color: #f2efe6;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 60;
+  -webkit-app-region: no-drag;
+}
+.perm-banner.hidden { display: none; }
+.perm-text { color: #ffd280; }
+.perm-btn {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f2efe6;
+  border-radius: 8px;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.perm-btn:hover { background: rgba(255, 255, 255, 0.16); }
+.perm-btn.primary { border-color: rgba(200, 245, 56, 0.5); color: #d6ff6a; }

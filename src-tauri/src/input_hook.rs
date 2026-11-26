@@ -84,6 +84,8 @@ static LAST_HOOK_MOUSE_X: AtomicI32 = AtomicI32::new(i32::MIN);
 static LAST_HOOK_MOUSE_Y: AtomicI32 = AtomicI32::new(i32::MIN);
 #[cfg(windows)]
 const WM_KURO_PAUSE_TOGGLE: u32 = 0x8007; // WM_APP + 7
+/// 看门狗发现钩子掉了（系统静默卸载 / 超时被回收）时投递，让钩子线程重装
+const WM_KURO_REHOOK: u32 = 0x8008; // WM_APP + 8
 
 fn is_alt_vk(vk: u32) -> bool {
     matches!(vk, 0x12 | 0xA4 | 0xA5)
@@ -163,6 +165,8 @@ impl KeyDeduplicator {
                     return None;
                 }
             }
+            // 真正按住不放：系统自动重复（不管快慢）统一算重复，绝不加计数。
+            // 丢了 KeyUp 的“假按住”由 sweep_released() 按物理键位清掉，不靠时间猜。
             return Some(true);
         }
         // Guard against micro-tap race: channel A delivered Down+Up, then channel B delivers
@@ -175,6 +179,28 @@ impl KeyDeduplicator {
         self.logical_pressed[idx] = true;
         self.last_down[idx] = Some((now, source));
         Some(false)
+    }
+
+    /// 周期性对账：键其实已经松开、但我们没收到 KeyUp 时，清掉“按住”标记，
+    /// 避免一个丢了 KeyUp 的键从此再也不计数。
+    fn sweep_released(&mut self) {
+        #[cfg(windows)]
+        {
+            for i in 0..512usize {
+                if !self.logical_pressed[i] {
+                    continue;
+                }
+                let down = unsafe {
+                    (windows_sys::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState(i as i32) as u16
+                        & 0x8000)
+                        != 0
+                };
+                // VK 0x10..0x12（Shift/Ctrl/Alt）用通用码查不准，跳过
+                if !down && !(0x10..=0x12).contains(&i) {
+                    self.logical_pressed[i] = false;
+                }
+            }
+        }
     }
 
     /// Returns `true` if a `KeyUp` should be emitted.
@@ -474,12 +500,20 @@ pub fn start_global_hooks(app: AppHandle) {
                 }
             };
 
+        let mut last_sweep = Instant::now();
         loop {
-            let msg = match rx.recv_timeout(Duration::from_millis(450)) {
+            let msg = match rx.recv_timeout(Duration::from_millis(120)) {
                 Ok(m) => Some(m),
                 Err(mpsc::RecvTimeoutError::Timeout) => None,
                 Err(mpsc::RecvTimeoutError::Disconnected) => break,
             };
+
+            // 不管有没有事件，每 150ms 对账一次：
+            // 把“其实已经松开、但 KeyUp 丢了”的键复位（长按时这些键物理上仍是按下，不会被误清）。
+            if last_sweep.elapsed() >= Duration::from_millis(150) {
+                dedup.sweep_released();
+                last_sweep = Instant::now();
+            }
 
             if HOOKS_PAUSED.load(Ordering::Relaxed) {
                 release_all_held(&app, &mut dedup, &mut mouse_down);
@@ -504,6 +538,7 @@ pub fn start_global_hooks(app: AppHandle) {
                         if let Some(repeat) = dedup.on_key_down(vk, source, Instant::now()) {
                             if !repeat {
                                 KEY_EVENTS_RECEIVED.fetch_add(1, Ordering::Relaxed);
+                                crate::profile::record_keypress(&app, vk);
                             }
                             emit_input(&app, InputEvent::KeyDown { vk, scan, repeat });
                         }
@@ -586,6 +621,54 @@ pub fn start_global_hooks(app: AppHandle) {
     #[cfg(windows)]
     std::thread::spawn(|| {
         run_windows_hook_loop();
+    });
+
+    // 看门狗：Windows 在低级钩子回调超时（LowLevelHooksTimeout）时会静默摘掉钩子，
+    // 表现就是「宠物还在置顶显示，但敲键盘毫无反应」。这里对比「系统有输入」与
+    // 「我们收到了输入」，不一致就通知钩子线程重装。
+    #[cfg(windows)]
+    std::thread::spawn(|| {
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
+        let mut last_tick: u32 = 0;
+        let mut last_events = KEY_EVENTS_RECEIVED.load(Ordering::Relaxed);
+        let mut last_mouse = LAST_HOOK_MOUSE_MS.load(Ordering::Relaxed);
+        let mut last_rehook = Instant::now() - Duration::from_secs(60);
+        loop {
+            std::thread::sleep(Duration::from_secs(3));
+            if HOOKS_PAUSED.load(Ordering::SeqCst) {
+                last_tick = 0;
+                continue;
+            }
+            let mut info = LASTINPUTINFO {
+                cbSize: std::mem::size_of::<LASTINPUTINFO>() as u32,
+                dwTime: 0,
+            };
+            let ok = unsafe { GetLastInputInfo(&mut info) };
+            if ok == 0 {
+                continue;
+            }
+            let events = KEY_EVENTS_RECEIVED.load(Ordering::Relaxed);
+            let mouse = LAST_HOOK_MOUSE_MS.load(Ordering::Relaxed);
+            let system_moved = last_tick != 0 && info.dwTime.wrapping_sub(last_tick) >= 400;
+            let we_moved = events != last_events || mouse != last_mouse;
+            if system_moved && !we_moved && last_rehook.elapsed() >= Duration::from_secs(20) {
+                last_rehook = Instant::now();
+                let tid = WIN_HOOK_TID.load(Ordering::SeqCst);
+                if tid != 0 {
+                    unsafe {
+                        windows_sys::Win32::UI::WindowsAndMessaging::PostThreadMessageW(
+                            tid,
+                            WM_KURO_REHOOK,
+                            0,
+                            0,
+                        );
+                    }
+                }
+            }
+            last_tick = info.dwTime;
+            last_events = events;
+            last_mouse = mouse;
+        }
     });
 
     #[cfg(target_os = "macos")]
@@ -782,6 +865,22 @@ fn run_windows_hook_loop() {
 
         let mut msg: MSG = std::mem::zeroed();
         while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
+            if msg.message == WM_KURO_REHOOK {
+                // 重装前先摘掉，避免重复挂同一个 proc
+                if !kb_hook.is_null() {
+                    UnhookWindowsHookEx(kb_hook);
+                    kb_hook = std::ptr::null_mut();
+                }
+                if !ms_hook.is_null() {
+                    UnhookWindowsHookEx(ms_hook);
+                    ms_hook = std::ptr::null_mut();
+                }
+                if !HOOKS_PAUSED.load(Ordering::SeqCst) {
+                    kb_hook = SetWindowsHookExW(WH_KEYBOARD_LL, Some(keyboard_hook_proc), hmod, 0);
+                    ms_hook = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_hook_proc), hmod, 0);
+                }
+                continue;
+            }
             if msg.message == WM_KURO_PAUSE_TOGGLE {
                 let pause = msg.wParam != 0;
                 if pause {

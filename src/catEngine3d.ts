@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { invoke } from '@tauri-apps/api/core';
 import type { CatSkinConfig } from './catSkins';
 import type { KeyboardLayoutId } from './keyboardLayout';
 import type { KeyboardOrientation, TailKeyMode } from './catEngine';
@@ -21,6 +22,9 @@ import {
   mix,
   smoothstep,
 } from './keyboard3d';
+import { buildAccessory3D, type Acc3DCtx } from './acc3d';
+import { makeOrangeBibCoat } from './coatTexture';
+import { ACCESSORY_ART, accessoryVisible, type ActivityState } from './collectibles';
 
 export type CollarColorId = 'none' | 'red' | 'blue' | 'pink' | 'green';
 
@@ -34,8 +38,8 @@ const COLLAR_COLORS: Record<Exclude<CollarColorId, 'none'>, string> = {
 const EYE_MAX_RX = 0.175;
 const EYE_MAX_RY = 0.160;
 const Z_SCALE = 0.82;
-const BODY_H = 1.98;
-const HEAD_CY = 1.56;
+const BODY_H = 2.06;
+const HEAD_CY = 1.58;
 
 interface PawTrack3D {
   side: -1 | 1;
@@ -524,6 +528,25 @@ export class KuroCatEngine3D {
   private readonly sHeadset = new Spring1D(0, 5.4, 0.70);
   private headsetOn = false;
   private readonly collarGroup = new THREE.Group();
+  /** 配饰项圈的锚点（独立于 collarGroup，内置项圈隐藏时仍能定位） */
+  private readonly neckMount = new THREE.Group();
+
+  // ---- 3D 配饰：真几何体挂在挂点上，和猫共用深度缓冲（不是画布叠加） ----
+  private accGroups: Record<string, THREE.Group> = {};
+  private accPawL: THREE.Group | null = null;
+  private accPawR: THREE.Group | null = null;
+  /** id -> 操作型触发文案（main.ts 注入） */
+  public accTriggers: Record<string, string> = {};
+  public accTotalKeys = 0;
+  private accToggled = false;
+  private accClickUntil = -1;
+  private accFeedUntil = -1;
+  private accHoverSince = -1;
+  private accStretchUntil = -1;
+  private accStreakStart = -1;
+  private accLastActive = -1;
+  /** 装备了 neck 配饰时隐藏内置项圈，避免「两条项圈」叠在一起 */
+  private hideBuiltinCollar = false;
   private readonly collarMat: THREE.MeshBasicMaterial;
   private readonly bellGroup = new THREE.Group();
   private readonly collarY = 1.32;
@@ -698,6 +721,10 @@ export class KuroCatEngine3D {
   private gameActive = false;
   private lastCamKey = '';
   private elapsed = 0;
+  private lastAccT = 0;
+  private orangeBibCoat: THREE.Texture | null = null;
+  private customCoat: THREE.Texture | null = null;
+  private coatLoading = false;
   private lastInput = 0;
   private lastKey = -100;
   private lastMouse = -100;
@@ -807,12 +834,12 @@ export class KuroCatEngine3D {
         [0.76, 0.67], // plump belly
         [0.68, 0.91], // mid chest
         [0.60, 1.12], // upper chest
-        [0.57, 1.32], // gentle plush neck (NO skinny KeyCat neck!)
-        [0.65, 1.50], // chubby cheeks widest
-        [0.61, 1.69], // eye line
-        [0.52, 1.87], // forehead
-        [0.34, 1.948], // crown shoulder
-        [0.0, BODY_H], // smooth rounded crown peak
+        [0.57, 1.30], // gentle plush neck (NO skinny KeyCat neck!)
+        [0.548, 1.52], // chubby cheeks widest（收窄 16%，头不再像馒头）
+        [0.516, 1.74], // eye line
+        [0.448, 1.94], // forehead
+        [0.295, 2.015], // crown shoulder
+        [0.0, 2.06], // smooth rounded crown peak
       ].map(([r, y]) => new THREE.Vector3(r, y, 0)),
       false,
       'centripetal',
@@ -898,6 +925,7 @@ export class KuroCatEngine3D {
     this.collarGroup.add(this.bellGroup);
     this.collarGroup.visible = false;
     this.catRoot.add(this.collarGroup);
+    this.catRoot.add(this.neckMount);
 
     // 4) Head Mount (tracks exact head center y=HEAD_CY inside continuous body mesh!)
     this.headMount.position.set(0, HEAD_CY, 0);
@@ -905,7 +933,10 @@ export class KuroCatEngine3D {
 
     // 5) Compact Rounded KuroCat 3D Ears (snug, slightly upright triangular cat tips matching Panel 1!)
     const earPts: Array<[number, number]> = [
-      [0.23, -0.05],
+      // 耳根只收到 0.190：底座圆环缩进颅骨内 1.2mm，外侧不再露出平底台阶。
+      // y ≥ 0.03 的可见耳廓一个点都没动，造型/大小/位置/材质/绑定完全不变。
+      [0.19, -0.05],
+      [0.204, -0.01],
       [0.21, 0.03],
       [0.18, 0.12],
       [0.135, 0.21],
@@ -922,7 +953,8 @@ export class KuroCatEngine3D {
     earGeo.setAttribute('rest', earGeo.attributes.position.clone());
     for (const s of [-1, 1] as const) {
       const g = new THREE.Group();
-      g.position.set(s * 0.295, 0.255, -0.015);
+      // 耳朵：形状/大小/位置/细节冻结（HEAD_CY 上移 0.02，这里补偿回原世界坐标）
+      g.position.set(s * 0.295, 0.235, -0.015);
       g.rotation.set(-0.06, 0, -s * 0.06);
       g.scale.set(1.0, 1.04, 1.0);
       const mesh = new THREE.Mesh(earGeo, this.furSystem.createMaterial('EAR', s));
@@ -936,7 +968,7 @@ export class KuroCatEngine3D {
     // 6) Curved Surface-Conforming KuroCat Eyes + Petting Lazy Slits + Closed Sleep Arcs + Soft Blush
     for (const s of [-1, 1] as const) {
       const lx = s * 0.232;
-      const ly = 0.105; // headMount local -> world y = 1.665 (exact KuroCat eye line!)
+      const ly = 0.140; // 头型拉高后，眼线跟着上移
 
       const eyeGeo = this.makeCurvedFacePatchGeo(lx, ly, EYE_MAX_RX, EYE_MAX_RY, 0.024, 20);
       const eyeMat = createEyeShaderMaterial(s);
@@ -1018,7 +1050,7 @@ export class KuroCatEngine3D {
 
     // 8) Delicate 3D Nose & "ω" Mouth (shown on Ragdoll / Tabby / Calico / Tuxedo / Siamese; hidden on pure Black Cat!)
     {
-      const NY = -0.042;
+      const NY = -0.030;
       const noseShape = new THREE.Shape();
       noseShape.moveTo(-0.040, 0.011);
       noseShape.quadraticCurveTo(0, 0.023, 0.040, 0.011);
@@ -1140,6 +1172,17 @@ export class KuroCatEngine3D {
     const boomMat = createHeadsetMaterial('#202530', 0.20, 0.20, '#7889a6');
     this.headsetShaderMats.push(shellMat, padMat, metalMat, boomMat);
 
+    // —— 贴合参数：全部由头骨半径派生，不再写死宽度 ——
+    // 耳罩内侧面目标 = 颅骨侧壁半径 - 2mm 压缩量；头梁衬垫轻压头顶。
+    const CUP_LY = 0.045;
+    const rCup = this.radiusAtY(HEAD_CY + CUP_LY);
+    const OLD_CUP_INNER = 0.652 - 0.058 * 0.95; // 旧模型耳罩内侧面
+    const fitX = clamp((rCup - 0.006) / OLD_CUP_INNER, 0.82, 1.0);
+    const fitY = 0.010; // 头梁整体上抬，衬垫只压 3mm
+    const fitMat = new THREE.Matrix4()
+      .makeTranslation(0, fitY, 0)
+      .multiply(new THREE.Matrix4().makeScale(fitX, 1, 1));
+
     // Collect static headset meshes by material and merge into 6 single draw calls (was 23 draw calls / 10.2k tris!)
     const shellParts: Array<{ geo: THREE.BufferGeometry; matrix?: THREE.Matrix4 }> = [];
     const padParts: Array<{ geo: THREE.BufferGeometry; matrix?: THREE.Matrix4 }> = [];
@@ -1238,7 +1281,7 @@ export class KuroCatEngine3D {
     disposeLater.push(cushionGeo, shellGeo, rimGeo, ledRingGeo, centerCapGeo, dotGeo, yokeGeo);
 
     for (const s of [-1, 1] as const) {
-      const cupMat = makeLocalMat([s * 0.652, 0.045, 0.012], [0, s * 0.08, -s * 0.10], [1, 1, 1]);
+      const cupMat = makeLocalMat([s * 0.652, 0.045, 0.012], [0, s * 0.07, -s * 0.055], [1, 1, 1]);
       const pushCup = (
         arr: Array<{ geo: THREE.BufferGeometry; matrix?: THREE.Matrix4 }>,
         geo: THREE.BufferGeometry,
@@ -1282,6 +1325,14 @@ export class KuroCatEngine3D {
     });
     disposeLater.push(micTipGeo);
 
+    // 把贴合变换烘进几何（动画每帧会覆盖 group 的 pos/scale，所以不能放在 group 上）
+    for (const arr of [shellParts, padParts, metalParts, ledParts]) {
+      for (const part of arr) {
+        part.matrix = part.matrix ? fitMat.clone().multiply(part.matrix) : fitMat.clone();
+      }
+    }
+    micArm.geometry.applyMatrix4(fitMat);
+
     this.headsetGroup.add(
       new THREE.Mesh(mergeStaticGeometries(shellParts), shellMat),
       new THREE.Mesh(mergeStaticGeometries(padParts), padMat),
@@ -1291,7 +1342,7 @@ export class KuroCatEngine3D {
     for (const g of disposeLater) g.dispose();
 
     const micLed = new THREE.Mesh(new THREE.SphereGeometry(0.014, 8, 6), this.headsetMicLedMat);
-    micLed.position.set(-0.172, -0.118, 0.588);
+    micLed.position.set(-0.172 * fitX, -0.118 + fitY, 0.588);
     this.headsetGroup.add(micLed);
 
     this.headsetGroup.visible = false;
@@ -1405,19 +1456,24 @@ export class KuroCatEngine3D {
     );
     this.headMount.rotation.set(this.headRot.pitch, this.headRot.yaw, this.headRot.roll, 'YXZ');
 
-    if (!this.collarGroup.visible) return;
+    // 脖子位置：锚点（neckMount）永远跟着算，内置项圈只在可见时才摆
     const y = this.collarY - 0.18 * clamp(this.headRot.pitch + 0.06, 0, 0.45);
     const s = this.radiusAtY(y) / Math.max(0.05, this.collarR);
-    this.collarGroup.scale.set(s, 1, s);
     const w = this.spineWeight(y);
     const dw = (this.spineWeight(y + 0.01) - this.spineWeight(y - 0.01)) / 0.02;
-    this.collarGroup.position.set(
-      this.bend.x * w,
-      y * (1 - this.bend.squash * this.sinkWeight(y)),
-      this.bend.z * w,
-    );
+    const nx = this.bend.x * w;
+    const ny = y * (1 - this.bend.squash * this.sinkWeight(y));
+    const nz = this.bend.z * w;
     const tx = clamp(Math.atan(this.bend.z * dw) * 0.45, -0.16, 0.16);
     const tz = clamp(-Math.atan(this.bend.x * dw) * 0.45, -0.16, 0.16);
+
+    this.neckMount.position.set(nx, ny, nz);
+    this.neckMount.rotation.set(tx, 0, tz);
+    this.neckMount.scale.set(s, 1, s);
+
+    if (!this.collarGroup.visible) return;
+    this.collarGroup.scale.set(s, 1, s);
+    this.collarGroup.position.set(nx, ny, nz);
     this.collarGroup.rotation.set(tx, 0, tz);
     this.bellGroup.rotation.set(-tx, 0, -tz);
   }
@@ -1432,6 +1488,318 @@ export class KuroCatEngine3D {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.lastCamKey = '';
+  }
+
+  /**
+   * 3D 模式下把配饰锚点投影到屏幕坐标（CSS 像素），供 2D 覆盖层绘制。
+   *
+   * 关键：偏移必须加在**挂点的局部坐标系**里再 localToWorld，
+   * 否则猫歪头 / 转身时配饰不会跟着转，看起来就是「位置有偏移」。
+   */
+  public getAccAnchors(): Record<string, { x: number; y: number; s: number; dir: number }> {
+    this.catRoot.updateMatrixWorld(true);
+
+    const v = new THREE.Vector3();
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+
+    /** mount 局部坐标 → 屏幕 CSS 像素 */
+    const proj = (mount: THREE.Object3D, ox: number, oy: number, oz: number) => {
+      v.set(ox, oy, oz);
+      mount.localToWorld(v);
+      v.project(this.camera);
+      return { x: (v.x * 0.5 + 0.5) * w, y: (-v.y * 0.5 + 0.5) * h };
+    };
+
+    // 用两只眼睛的屏幕距离标定尺度：眼距 = 0.464 个世界单位，
+    // 这样无论相机远近、窗口多大，配饰都跟头部同比例。
+    const eyeL = proj(this.headMount, -0.232, 0.105, 0.45);
+    const eyeR = proj(this.headMount, 0.232, 0.105, 0.45);
+    const eyeSpanPx = Math.hypot(eyeR.x - eyeL.x, eyeR.y - eyeL.y);
+    const s = Math.max(0.2, Math.min(4, eyeSpanPx / 35.6));
+    const dir = 1;
+
+    // 头壳顶端：headMount 局部 y = BODY_H - HEAD_CY = 0.48；
+    // 帽子要「套」在额头上，取 0.34（帽檐下沿刚好压住额头顶弧）。
+    const headPoint = proj(this.headMount, 0, 0.34, 0.02);
+    // 眼睛中线：局部 (±0.232, 0.105)，曲面前表面 z ≈ 0.50
+    const facePoint = proj(this.headMount, 0, 0.105, 0.5);
+    // 项圈前表面
+    const neckPoint = proj(this.neckMount, 0, -0.06, this.collarR * Z_SCALE * 0.92);
+
+    const at = (mount: THREE.Object3D, ox: number, oy: number, oz: number) => ({
+      ...proj(mount, ox, oy, oz),
+      s,
+      dir,
+    });
+
+    return {
+      head: { ...headPoint, s, dir },
+      face: { ...facePoint, s, dir },
+      neck: { ...neckPoint, s, dir },
+      back: at(this.catRoot, 0, 1.15, -0.3),
+      paw: at(this.catRoot, -0.3, 0.16, 0.3),
+      prop: at(this.catRoot, 0.42, 0.2, 0.3),
+      floor: at(this.catRoot, 0, 0.02, 0.14),
+    };
+  }
+
+  // ---------------------------------------------------------------- 3D 配饰
+
+  private accCtx(): Acc3DCtx {
+    return {
+      headRadius: (ly: number) => this.radiusAtY(HEAD_CY + ly),
+      surfaceZ: (x: number, y: number) => this.surfaceZ(x, y),
+      collarR: this.collarR,
+      zScale: Z_SCALE,
+    };
+  }
+
+  private disposeAccGroup(g: THREE.Object3D): void {
+    g.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh) {
+        m.geometry.dispose();
+        const mat = m.material as THREE.Material | THREE.Material[];
+        if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
+        else mat.dispose();
+      }
+    });
+  }
+
+  /**
+   * 换装：只重建发生变化的槽位。
+   * 每件配饰都 add 到对应挂点（headMount / neckMount / catRoot），
+   * 因此和猫体共用 z-buffer —— 帽子会真的压在毛上、被耳朵挡住，
+   * 而不是浮在屏幕最上层。
+   */
+  public setAccessories3D(equipped: Record<string, string>, triggers?: Record<string, string>): void {
+    if (triggers) this.accTriggers = triggers;
+    const ctx = this.accCtx();
+    const slots = ['head', 'face', 'neck', 'back', 'paw', 'floor', 'prop'] as const;
+    let changed = false;
+
+    for (const slot of slots) {
+      const id = equipped?.[slot] || '';
+      const cur = this.accGroups[slot];
+      const curId = (cur?.userData.accId as string) || '';
+      if (curId === id) continue;
+      changed = true;
+
+      // 拆掉旧的
+      if (cur) {
+        this.disposeAccGroup(cur);
+        cur.parent?.remove(cur);
+        delete this.accGroups[slot];
+      }
+      if (slot === 'paw') {
+        for (const g of [this.accPawL, this.accPawR]) {
+          if (!g) continue;
+          this.disposeAccGroup(g);
+          this.scene.remove(g);
+        }
+        this.accPawL = null;
+        this.accPawR = null;
+      }
+      if (!id) continue;
+
+      const art = ACCESSORY_ART[id];
+      if (!art) continue;
+      const g = buildAccessory3D(art.shape, art.c1, art.c2, slot, ctx, id);
+      if (!g) continue;
+      g.userData.accId = id;
+
+      if (slot === 'paw') {
+        const left = g;
+        const right = g.clone(true);
+        this.scene.add(left, right);
+        this.accPawL = left;
+        this.accPawR = right;
+        this.accGroups[slot] = left;
+        continue;
+      }
+
+      const parent =
+        slot === 'neck' ? this.neckMount : slot === 'head' || slot === 'face' ? this.headMount : this.catRoot;
+      parent.add(g);
+      this.accGroups[slot] = g;
+    }
+
+    if (changed) {
+      this.wakeRendering();
+      this.applyAccRenderStyle();
+    }
+  }
+
+  /** 渲染风格切换（3d / 3d-flat）时统一刷新配饰材质 */
+  private applyAccRenderStyle(): void {
+    const is3d = this.renderStyle === '3d' ? 1 : 0;
+    for (const g of Object.values(this.accGroups)) {
+      g.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (!m.isMesh) return;
+        const mats = Array.isArray(m.material) ? m.material : [m.material];
+        for (const mat of mats) {
+          const u = (mat as THREE.ShaderMaterial).uniforms;
+          if (u?.uIs3D) u.uIs3D.value = is3d;
+        }
+      });
+    }
+  }
+
+  /** main.ts 把玩家动作转进来（点击猫 / 喂食 / 切换 / 悬停 / 睡醒） */
+  public notifyAction(action: 'click' | 'feed' | 'toggle' | 'hover' | 'wake'): void {
+    const t = this.elapsed;
+    switch (action) {
+      case 'click':
+        this.accClickUntil = t + 6;
+        break;
+      case 'feed':
+        this.accFeedUntil = t + 12;
+        break;
+      case 'toggle':
+        this.accToggled = !this.accToggled;
+        break;
+      case 'hover':
+        if (this.accHoverSince < 0) this.accHoverSince = t;
+        break;
+      case 'wake':
+        this.accStretchUntil = t + 4;
+        break;
+    }
+    this.accLastActive = t;
+    this.wakeRendering();
+  }
+
+  private accActivityState(): ActivityState {
+    const t = this.elapsed;
+    const idleSeconds = this.accLastActive > 0 ? t - this.accLastActive : 0;
+    const combo = this.strokes.filter((s) => t - s < 1).length;
+    const typingActive = t - this.lastKey < 1.6;
+    if (typingActive && this.accStreakStart < 0) this.accStreakStart = this.lastKey;
+    if (!typingActive && t - this.lastKey > 2) this.accStreakStart = -1;
+    return {
+      typingActive,
+      combo,
+      idleSeconds,
+      typingStreak: this.accStreakStart > 0 ? t - this.accStreakStart : 0,
+      toggled: this.accToggled,
+      clickPulse: t < this.accClickUntil,
+      feedPulse: t < this.accFeedUntil,
+      hoverHead: this.accHoverSince > 0 && t - this.accHoverSince > 3,
+      stretchPulse: t < this.accStretchUntil,
+      totalKeys: this.accTotalKeys,
+    };
+  }
+
+  /** 每帧驱动可动部件：翅膀扇动、铃铛摆动、布料飘动、帽尖摇晃、气球漂浮 */
+  private animateAccParts(): void {
+    const t = this.elapsed;
+    const dt = Math.min(0.06, Math.max(0.001, t - (this.lastAccT || t)));
+    this.lastAccT = t;
+    const typing = t - this.lastKey < 1.2;
+    for (const g of Object.values(this.accGroups)) {
+      if (!g) continue;
+      g.traverse((o) => {
+        const a = o.userData.anim as
+          | { kind: string; side: number; amp: number; phase: number }
+          | undefined;
+        if (!a) return;
+        const b = o.userData.base as
+          | { rx: number; ry: number; rz: number; px: number; py: number; pz: number }
+          | undefined;
+        if (!b) return;
+        switch (a.kind) {
+          case 'flap': {
+            // 打字时扇得更快更大，像被键盘声带着扑腾
+            const speed = typing ? 8.0 : 3.1;
+            const amp = (typing ? 0.62 : 0.26) * a.amp;
+            o.rotation.z = b.rz + Math.sin(t * speed + a.phase) * amp * a.side;
+            o.rotation.y = b.ry + Math.sin(t * speed * 0.5 + a.phase) * 0.09 * a.side;
+            o.rotation.x = b.rx + Math.cos(t * speed + a.phase) * 0.05 * a.side;
+            break;
+          }
+          case 'glide': {
+            // 天使翼：慢拍、有惯性。相位连续累加（改速度不会瞬间跳相），
+            // 振幅走一阶弹簧（起落有迟滞），再叠一点慢速拍频起伏，避免机械正弦。
+            const st =
+              (o.userData.animState as
+                | { ph: number; amp: number; w: number }
+                | undefined) ??
+              (o.userData.animState = {
+                ph: a.phase,
+                amp: (typing ? 0.20 : 0.10) * a.amp,
+                w: typing ? 3.65 : 2.55,
+              });
+            const targetW = (typing ? 3.65 : 2.55) * Math.max(0.35, a.amp);
+            const targetAmp = (typing ? 0.32 : 0.15) * a.amp;
+            st.w += (targetW - st.w) * (1 - Math.exp(-dt * 1.6));
+            st.ph += dt * st.w;
+            st.amp += (targetAmp - st.amp) * (1 - Math.exp(-dt * 2.1));
+            const beat = st.amp * (0.86 + 0.14 * Math.sin(st.ph * 0.23 + a.phase));
+            const wav = Math.sin(st.ph + 0.14 * Math.sin(st.ph * 2));
+            o.rotation.z = b.rz + wav * beat * a.side;
+            o.rotation.x = b.rx + Math.sin(st.ph - 0.55) * 0.045 * a.amp * a.side; // 相位滞后 → 收翅有跟随感
+            o.rotation.y = b.ry + Math.cos(st.ph * 0.5 + 0.3) * 0.018 * a.amp * a.side;
+            break;
+          }
+          case 'swing':
+            o.rotation.z = b.rz + Math.sin(t * 2.3 + a.phase) * 0.17 * a.amp;
+            o.rotation.x = b.rx + Math.sin(t * 1.7 + a.phase + 1) * 0.10 * a.amp;
+            break;
+          case 'sway':
+            o.rotation.x = b.rx + Math.sin(t * 1.5 + a.phase) * 0.10 * a.amp;
+            o.rotation.z = b.rz + Math.sin(t * 1.1 + a.phase) * 0.06 * a.amp;
+            break;
+          case 'tip':
+            o.rotation.z = b.rz + Math.sin(t * 1.9 + a.phase) * 0.07 * a.amp;
+            break;
+          case 'float':
+            o.position.y = b.py + Math.sin(t * 1.3 + a.phase) * 0.030 * a.amp;
+            o.rotation.z = b.rz + Math.sin(t * 1.05 + a.phase) * 0.06 * a.amp;
+            break;
+          case 'spin':
+            o.rotation.y = b.ry + t * 0.9 * a.amp;
+            break;
+          default:
+            break;
+        }
+      });
+    }
+  }
+
+  /** 每帧：按操作型触发决定显隐；爪部配饰跟随真实爪位 */
+  private updateAccessories3D(): void {
+    const slots = Object.keys(this.accGroups);
+    if (slots.length === 0 && !this.accPawL) return;
+    const state = this.accActivityState();
+    let pawVisible = true;
+    for (const slot of slots) {
+      const g = this.accGroups[slot];
+      const id = (g.userData.accId as string) || '';
+      const trig = this.accTriggers[id];
+      const vis = trig ? accessoryVisible(trig, state) : true;
+      g.visible = vis;
+      if (slot === 'paw') pawVisible = vis;
+    }
+    // 爪套：复制 arm.paw 的世界变换（爪子会跟着打字/点鼠标动）
+    const pairs: Array<[THREE.Group | null, THREE.Mesh | null]> = [
+      [this.accPawL, this.arms.find((a) => a.s < 0)?.paw ?? null],
+      [this.accPawR, this.arms.find((a) => a.s > 0)?.paw ?? null],
+    ];
+    for (const [group, paw] of pairs) {
+      if (!group || !paw) continue;
+      group.visible = pawVisible;
+      // 爪子在 catRoot（有位置/缩放）里，直接 copy 局部变换会整体偏移到屏幕外，
+      // 必须用世界矩阵分解，爪套才会真的套在爪子上。
+      paw.updateWorldMatrix(true, false);
+      paw.matrixWorld.decompose(group.position, group.quaternion, group.scale);
+      // 爪套是「单位球」建模，和爪子网格差不多大：稍微放大一点才包得住，
+      // 否则整个鞋/袜埋在爪子里，看起来就是「没显示」。
+      group.scale.multiplyScalar(1.10);
+    }
+
+    this.animateAccParts();
   }
 
   public start(): void {
@@ -1529,11 +1897,46 @@ export class KuroCatEngine3D {
     }, sleepMs);
   };
 
+  /** 尝试加载用户自备的毛色贴图；没有就继续用程序化那张 */
+  private loadCustomCoat(): void {
+    if (this.customCoat || this.coatLoading) return;
+    this.coatLoading = true;
+    invoke<string | null>('get_coat_image')
+      .then((url) => {
+        if (!url) return;
+        const img = new Image();
+        img.onload = () => {
+          const tex = new THREE.CanvasTexture(img);
+          tex.colorSpace = THREE.SRGBColorSpace;
+          tex.wrapS = THREE.RepeatWrapping;
+          tex.wrapT = THREE.ClampToEdgeWrapping;
+          tex.anisotropy = 4;
+          tex.needsUpdate = true;
+          this.customCoat = tex;
+          if (this.currentSkin?.id === 'orange-bib') this.furSystem.setCoat(tex, 0.95);
+        };
+        img.src = url;
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        this.coatLoading = false;
+      });
+  }
+
   public setCatSkin(skin: CatSkinConfig): void {
     this.currentSkin = skin;
     const p = resolveFurPalette3D(skin, this.renderStyle);
     this.currentPalette = p;
     this.furSystem.applyPalette(p, skin.spots || []);
+    // 只有橘白奶盖走一比一毛色贴图（身体 UV 直接按片织法上色）
+    if (skin.id === 'orange-bib') {
+      if (!this.orangeBibCoat) this.orangeBibCoat = makeOrangeBibCoat(1024);
+      // 有自定义贴图（%APPDATA%\kuro-cat-pet\skins\orange-bib-coat.png）就用它，否则用程序化那张
+      this.furSystem.setCoat(this.customCoat ?? this.orangeBibCoat, 0.95);
+      this.loadCustomCoat();
+    } else {
+      this.furSystem.setCoat(null);
+    }
     this.desk.setAccentColors(p.accent, p.accentRight);
     this.desk.setStyle(this.renderStyle);
 
@@ -1571,9 +1974,17 @@ export class KuroCatEngine3D {
     }
   }
 
+  /** 装备/卸下颈部配饰时切换，避免内置项圈与配饰项圈重叠 */
+  public setHideBuiltinCollar(hide: boolean): void {
+    if (this.hideBuiltinCollar === hide) return;
+    this.hideBuiltinCollar = hide;
+    this.collarGroup.visible = !hide && this.collarId !== 'none';
+    this.placeHeadAndCollar();
+  }
+
   public setCollar(id: CollarColorId): void {
     this.collarId = id;
-    if (id === 'none') {
+    if (id === 'none' || this.hideBuiltinCollar) {
       this.collarGroup.visible = false;
     } else {
       this.collarGroup.visible = true;
@@ -1591,6 +2002,10 @@ export class KuroCatEngine3D {
       }
       this.wakeRendering();
     }
+  }
+
+  public setKeyboardPreset(preset: unknown): void {
+    this.desk.setPreset(preset as Parameters<typeof this.desk.setPreset>[0]);
   }
 
   public setKeyboardConfig(layout: KeyboardLayoutId, orient: KeyboardOrientation): void {
@@ -2484,6 +2899,9 @@ export class KuroCatEngine3D {
       arm.paw.scale.set(0.126 * pawScale, 0.080 * pawScale, 0.118 * pawScale);
       arm.paw.rotation.y = Math.atan2(arm.hand.x - arm.c2.x, Math.max(0.1, arm.hand.z - arm.c2.z)) * 0.42;
     }
+
+    // 配饰显隐 + 爪套跟随
+    this.updateAccessories3D();
 
     // 10) Floating Key Bubbles, Anger Mark 💢 & Sleep Zzz FX
     for (let i = this.popups.length - 1; i >= 0; i--) {

@@ -18,3 +18,9 @@ android/app/src/main/assets/web/
 *.keystore
 *.apk
 *.aab
+
+# local scratch / assistant state
+.workbuddy/
+.tmp_*.cjs
+scripts/*.png
+sound-preview.html

@@ -13,11 +13,17 @@
       </div>
 
       <div class="menu-tabs" role="tablist" aria-label="设置分类">
-        <button class="menu-tab-btn active" data-tab="appearance" type="button" role="tab" aria-selected="true">
-          🐱 外观与互动
+        <button class="menu-tab-btn active" data-tab="appearance" type="button" role="tab" aria-selected="true" title="外观与互动">
+          🐱 外观
         </button>
-        <button class="menu-tab-btn" data-tab="system" type="button" role="tab" aria-selected="false">
-          ⚙️ 键盘·OBS·系统
+        <button class="menu-tab-btn" data-tab="system" type="button" role="tab" aria-selected="false" title="键盘、OBS 与系统设置">
+          ⚙️ 系统
+        </button>
+        <button class="menu-tab-btn" data-tab="shop" type="button" role="tab" aria-selected="false" title="用敲键盘攒的猫条兑换装备">
+          🐟 商店
+        </button>
+        <button class="menu-tab-btn" data-tab="owned" type="button" role="tab" aria-selected="false" title="查看已拥有的配饰和特效">
+          🎒 已拥有
         </button>
       </div>
 
@@ -29,13 +35,7 @@
             <div class="breed-pills" id="breed-pills"></div>
           </div>
 
-          <div class="menu-scale-row" id="render-mode-row">
-            <span class="menu-scale-label">视觉模式（可选 3D / 2D）</span>
-            <div class="kb-pills">
-              <button class="kb-pill active" data-rendermode="3d" type="button" title="Three.js 真 3D 体积光影手办">✨ 3D 立体</button>
-              <button class="kb-pill" data-rendermode="2d" type="button" title="经典 2D 矢量手绘，极简省电">🎨 2D 经典</button>
-            </div>
-          </div>
+          <div class="menu-scale-row hidden" id="render-mode-row" aria-hidden="true"></div>
 
           <div class="menu-scale-row" id="collar-row">
             <span class="menu-scale-label">3D 项圈铃铛</span>
@@ -67,6 +67,61 @@
             <span>悬浮按键气泡</span>
             <span class="menu-check" id="chk-bubbles">✓</span>
           </button>
+          <button class="menu-item" data-action="toggle-fish-bubble" title="打字时在猫头顶显示今天敲了多少下、攒了多少小鱼干">
+            <span>头顶小鱼干气泡</span>
+            <span class="menu-check" id="chk-fish-bubble">✓</span>
+          </button>
+          <button class="menu-item" data-action="toggle-keysound">
+            <span>敲键盘音效</span>
+            <span class="menu-check" id="chk-keysound">✓</span>
+          </button>
+          <div class="menu-scale-row" id="keysound-row">
+            <div class="keysound-pills">
+              <button class="kb-pill" data-keysoundstyle="mechanical" type="button">机械</button>
+              <button class="kb-pill" data-keysoundstyle="blue" type="button">青轴</button>
+              <button class="kb-pill" data-keysoundstyle="thock" type="button">闷响</button>
+              <button class="kb-pill" data-keysoundstyle="soft" type="button">软拍</button>
+              <button class="kb-pill" data-keysoundstyle="typewriter" type="button">打字机</button>
+              <button class="kb-pill" data-keysoundstyle="bubble" type="button">气泡</button>
+              <button class="kb-pill" data-keysoundstyle="woodblock" type="button">木鱼</button>
+              <button class="kb-pill" data-keysoundstyle="droplet" type="button">水滴</button>
+              <button class="kb-pill" data-keysoundstyle="coin" type="button">金币</button>
+              <button class="kb-pill" data-keysoundstyle="meow" type="button">喵叫</button>
+              <button class="kb-pill" data-keysoundstyle="custom" type="button">自定义</button>
+              <button class="kb-pill keysound-preview" data-action="preview-keysound" type="button">▶ 试听当前音色</button>
+            </div>
+            <div class="scale-slider-wrap">
+              <input
+                type="range"
+                id="keysound-slider"
+                class="scale-slider"
+                min="0"
+                max="100"
+                step="1"
+                value="55"
+              />
+              <div class="scale-ticks">
+                <span>静音</span>
+                <span class="scale-tick-mid">音量 <b id="keysound-value">55%</b></span>
+                <span>最大</span>
+              </div>
+            </div>
+            <div class="keysound-pack-row">
+              <label class="keysound-pack-label" for="keysound-pack">音色包</label>
+              <select id="keysound-pack" class="keysound-pack-select"></select>
+            </div>
+            <div class="keysound-custom-row" id="keysound-custom-row">
+              <button class="keysound-custom-btn" data-action="open-keysound-folder" type="button">
+                📂 打开音效文件夹
+              </button>
+              <button class="keysound-custom-btn" data-action="rescan-keysound" type="button">
+                🔄 重新扫描
+              </button>
+              <div class="keysound-custom-hint" id="keysound-custom-hint">
+                把 wav / mp3 丢进文件夹后选「自定义」，多个文件会随机播放
+              </div>
+            </div>
+          </div>
           <button class="menu-item" data-action="toggle-lock" id="btn-toggle-lock" title="开启后重启保持锁定，按住 Alt 或在托盘可随时解锁">
             <span id="lbl-toggle-lock">锁定鼠标穿透（Alt 解锁）</span>
             <span class="menu-check" id="chk-lock"></span>
@@ -87,16 +142,30 @@
 
         <!-- Tab 2: Keyboard, OBS, MCP & System -->
         <div class="tab-panel hidden" data-tab-panel="system">
+          <div class="menu-scale-row admin-hint hidden" id="admin-hint" data-action="restart-admin">
+            <span class="menu-scale-label">⚠️ 当前前台程序以管理员运行，键盘监听会被系统挡住</span>
+            <span class="admin-hint-btn">点这里以管理员身份重启 →</span>
+          </div>
+
           <div class="menu-scale-row">
             <span class="menu-scale-label">键盘配列与方向</span>
             <div class="kb-pills">
               <button class="kb-pill active" data-kblayout="65" type="button">65% 紧凑</button>
+              <button class="kb-pill" data-kblayout="75" type="button">75% 三模</button>
               <button class="kb-pill" data-kblayout="108" type="button">108 全尺寸</button>
             </div>
             <div class="kb-pills">
               <button class="kb-pill active" data-kborient="cat" type="button">面向猫咪</button>
               <button class="kb-pill" data-kborient="viewer" type="button">面向观众</button>
             </div>
+          </div>
+
+          <div class="menu-scale-row">
+            <span class="menu-scale-label">键盘样式</span>
+            <select id="kb-preset" class="keysound-pack-select"></select>
+            <button class="keysound-custom-btn" data-action="open-keyboard-folder" type="button">
+              📂 键盘文件夹
+            </button>
           </div>
 
           <div class="menu-scale-row">
@@ -175,13 +244,71 @@
             <span>重置位置到右下角</span>
           </button>
         </div>
+
+        <div class="tab-panel hidden" data-tab-panel="shop">
+          <div class="shop-head">
+            <span class="shop-balance">
+              <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+                <g transform="rotate(-20 8 8)" fill="none" stroke="#c8f538" stroke-width="1.2">
+                  <rect x="1.9" y="5.7" width="12.2" height="4.6" rx="1.3"/>
+                  <path d="M3.7 5.7v4.6M12.3 5.7v4.6"/>
+                </g>
+                <circle cx="6.4" cy="9" r="0.75" fill="#c8f538"/>
+              </svg>
+              <b id="shop-fish">0</b>
+              <span class="shop-balance-unit">猫条</span>
+            </span>
+            <span class="shop-rate" id="shop-rate">再敲 50 下 +1</span>
+          </div>
+          <div class="shop-filters" id="shop-filters">
+            <button class="shop-filter active" data-shopf="all" type="button">全部</button>
+            <button class="shop-filter" data-shopf="head" type="button">头部</button>
+            <button class="shop-filter" data-shopf="face" type="button">面部</button>
+            <button class="shop-filter" data-shopf="neck" type="button">颈部</button>
+            <button class="shop-filter" data-shopf="back" type="button">背部</button>
+            <button class="shop-filter" data-shopf="paw" type="button">爪部</button>
+            <button class="shop-filter" data-shopf="floor" type="button">地面</button>
+            <button class="shop-filter" data-shopf="prop" type="button">道具</button>
+            <button class="shop-filter" data-shopf="fx" type="button">特效</button>
+            <button class="shop-filter shop-filter-all" data-shopall="1" type="button" title="连还没上架的也一起看">🔍 预览全部</button>
+          </div>
+          <div class="shop-week" id="shop-week"></div>
+          <div class="shop-grid" id="shop-grid"></div>
+          <div class="shop-tip">每敲 50 下键盘攒 1 根猫条；按住不放的连击不重复计。</div>
+        </div>
+
+        <div class="tab-panel hidden" data-tab-panel="owned">
+          <div class="shop-head">
+            <span class="shop-balance">🎒 已拥有 <b id="owned-count">0</b> 件</span>
+            <span class="shop-rate" id="owned-equipped">装备中 0</span>
+          </div>
+          <input id="owned-search" class="owned-search" type="search" placeholder="搜名字，比如「帽」「围巾」「星星」" />
+          <div class="shop-filters" id="owned-filters">
+            <button class="shop-filter active" data-ownedf="all" type="button">全部</button>
+            <button class="shop-filter" data-ownedf="equip" type="button">配饰</button>
+            <button class="shop-filter" data-ownedf="effect" type="button">特效</button>
+          </div>
+          <div class="shop-grid" id="owned-grid"></div>
+          <div class="shop-tip">点一下就能换上／卸下；同部位只显示一件，特效同时只开一个。</div>
+        </div>
       </div>
 
       <div class="tab-footer">
-        <button class="footer-btn" data-action="check-update" id="btn-check-update" type="button">
-          <span id="update-hint">检查更新 v5.1.0</span>
+        <button class="footer-btn" data-action="contact-author" id="btn-contact-author" type="button" title="点击复制作者 QQ：2361075845">
+          <span id="contact-hint">📮 联系作者</span>
         </button>
         <button class="footer-btn danger" data-action="quit" type="button">退出</button>
+      </div>
+    </div>
+
+    <div class="acc-modal hidden" id="acc-modal">
+      <div class="acc-card">
+        <button class="acc-close" id="acc-close" type="button" aria-label="关闭">✕</button>
+        <div class="acc-big" id="acc-big"></div>
+        <div class="acc-title" id="acc-title"></div>
+        <div class="acc-sub" id="acc-sub"></div>
+        <div class="acc-desc" id="acc-desc"></div>
+        <button class="acc-act" id="acc-act" type="button">兑换</button>
       </div>
     </div>
 

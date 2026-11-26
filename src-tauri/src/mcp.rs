@@ -143,7 +143,7 @@ fn tool_definitions() -> Value {
         },
         {
             "name": "update_settings",
-            "description": "Update KuroCat desktop pet settings live (scale 0.2-1.5, showKeyBubbles, soundEnabled, alwaysOnTop, clickThroughLocked, catBreed, keyboardLayout 65|108, keyboardOrientation cat|viewer, tailKeyMode smart|custom|edge|off, tailKeyIds string[], autostart).",
+            "description": "Update KuroCat desktop pet settings live (scale 0.2-1.5, showKeyBubbles, soundEnabled, alwaysOnTop, clickThroughLocked, catBreed, keyboardLayout 65|108, keyboardOrientation cat|viewer, tailKeyMode smart|custom|edge|off, tailKeyIds string[], keySoundEnabled, keySoundVolume 0-100, keySoundStyle mechanical|blue|thock|soft|typewriter|bubble|woodblock|droplet|coin|meow|custom, keySoundPack (folder name under %APPDATA%\\\\kuro-cat-pet\\\\sounds), autostart).",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -152,7 +152,7 @@ fn tool_definitions() -> Value {
                     "collarColor": { "type": "string", "enum": ["none", "red", "blue", "pink", "green"], "description": "Optional 3D collar & gold bell color in 3D mode." },
                     "headphoneMode": { "type": "string", "enum": ["auto", "on", "off"], "description": "Gaming headset mode: 'auto' (automatically wears headphones when a PC game is active), 'on' (always on), or 'off'." },
                     "scale": { "type": "number", "minimum": 0.2, "maximum": 1.5 },
-                    "keyboardLayout": { "type": "string", "enum": ["65", "108"] },
+                    "keyboardLayout": { "type": "string", "enum": ["65", "75", "108"] },
                     "keyboardOrientation": { "type": "string", "enum": ["cat", "viewer"] },
                     "tailKeyMode": { "type": "string", "enum": ["smart", "custom", "edge", "off"] },
                     "tailKeyIds": {
@@ -162,6 +162,10 @@ fn tool_definitions() -> Value {
                     },
                     "showKeyBubbles": { "type": "boolean" },
                     "soundEnabled": { "type": "boolean" },
+                    "keySoundEnabled": { "type": "boolean", "description": "Typing (keystroke) sound effect on/off." },
+                    "keySoundVolume": { "type": "integer", "minimum": 0, "maximum": 100, "description": "Typing sound volume 0-100." },
+                    "keySoundStyle": { "type": "string", "enum": ["mechanical", "blue", "thock", "soft", "typewriter", "bubble", "woodblock", "droplet", "coin", "meow", "custom"], "description": "Typing sound style: mechanical / blue clicky / thock / soft paw tap / typewriter / bubble pop / woodblock / water droplet / 8-bit coin / meow / custom (user sound packs in %APPDATA%\\kuro-cat-pet\\sounds)." },
+                    "keySoundPack": { "type": "string", "description": "Sub folder name of the sound pack used when keySoundStyle is 'custom' (empty = loose files in the sounds root). Supports Mechvibes packs." },
                     "alwaysOnTop": { "type": "boolean" },
                     "clickThroughLocked": { "type": "boolean" },
                     "autostart": { "type": "boolean" }
@@ -318,6 +322,18 @@ fn execute_tool(name: &str, args: &Value, on_change: &dyn Fn()) -> Value {
             }
             if let Some(b) = args.get("soundEnabled").and_then(|v| v.as_bool()) {
                 s.sound_enabled = b;
+            }
+            if let Some(b) = args.get("keySoundEnabled").and_then(|v| v.as_bool()) {
+                s.key_sound_enabled = b;
+            }
+            if let Some(v) = args.get("keySoundVolume").and_then(|v| v.as_u64()) {
+                s.key_sound_volume = v.min(100) as u8;
+            }
+            if let Some(v) = args.get("keySoundStyle").and_then(|v| v.as_str()) {
+                s.key_sound_style = crate::config::normalize_key_sound_style(v);
+            }
+            if let Some(v) = args.get("keySoundPack").and_then(|v| v.as_str()) {
+                s.key_sound_pack = crate::config::normalize_key_sound_pack(v);
             }
             if let Some(b) = args.get("alwaysOnTop").and_then(|v| v.as_bool()) {
                 s.always_on_top = b;
