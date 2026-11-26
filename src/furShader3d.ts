@@ -127,13 +127,14 @@ export function resolveFurPalette3D(skin: CatSkinConfig, style: RenderStyle3D): 
     case 'ragdoll':
       return {
         id: 'ragdoll',
-        fur: '#f7f3ea',
-        light: '#fdfbf7',
-        dark: '#7e6c5e',
-        patchA: '#f7f3ea',
-        patchB: '#f7f3ea',
-        point: '#8a786a',
-        earOuter: null,
+        // 参照实拍：奶白底毛 + 浅灰蓝倒 V 面罩 + 深灰耳尖 + 蓝宝石眼 + 粉鼻
+        fur: '#f6f1e7',
+        light: '#fefcf8',
+        dark: '#b9c0ca',
+        patchA: '#f6f1e7',
+        patchB: '#f6f1e7',
+        point: '#bcc3ce',
+        earOuter: '#6f6b67',
         tailBase: null,
         inner: '#dec4be',
         stripes: 0,
@@ -144,21 +145,21 @@ export function resolveFurPalette3D(skin: CatSkinConfig, style: RenderStyle3D): 
         points: 1,
         innerAmt: 0.92,
         shade: is3D ? 0.85 : 0,
-        paw: '#fdfbf7',
-        pawTuckLine: 'rgba(116, 102, 90, 0.28)',
-        toe: '#d4c8bc',
-        whisker: '#7e6f64',
+        paw: '#fefcf8',
+        pawTuckLine: 'rgba(150, 145, 140, 0.24)',
+        toe: '#ddd6cc',
+        whisker: '#8d8680',
         whiskerOpacity: 0.56,
-        nose: '#ee8e9e',
+        nose: '#e79a9a',
         mouth: '#5c524c',
-        eyeTop: '#2c5594',
-        eyeBottom: '#a3d2f2',
+        eyeTop: '#2f6fd0',
+        eyeBottom: '#86bdf0',
         pupil: '#101624',
         lid: '#222736',
         squintLine: '#222736',
         eyeCatchlight: true,
         isDarkFur: false,
-        lightContour: '#685b50',
+        lightContour: '#8c8781',
         accent,
         accentRight,
         accentSide,
@@ -395,6 +396,7 @@ export class FurShaderSystem {
       uCalico: { value: 0 },
       uTuxedo: { value: 0 },
       uPoints: { value: 0 },
+      uRagdollV: { value: 0 },
       uInnerAmt: { value: 0.5 },
       uShade: { value: 1.0 },
       uIsDarkFur: { value: 1.0 },
@@ -525,6 +527,7 @@ export class FurShaderSystem {
     const fragmentShader = `
       uniform vec3 uFur, uLight, uDark, uPatchA, uPatchB, uPoint, uInner, uPawColor, uEarOuter, uTailBase;
       uniform float uStripes, uMuzzle, uBib, uCalico, uTuxedo, uPoints, uInnerAmt, uShade, uIsDarkFur, uEarOuterAmt, uTailBaseAmt;
+      uniform float uRagdollV;
       #ifdef CAT_BODY
         uniform sampler2D uCoatMap;
         uniform float uCoatAmt;
@@ -575,8 +578,16 @@ export class FurShaderSystem {
             vec2 q = hp.xy;
             if (uPoints > 0.01) {
               // Colourpoint face mask (Siamese & Ragdoll upper cap/temples)
-              float maskDist = length((q - vec2(0.0, 0.08)) / vec2(0.95, 0.86));
+              float maskDist = length((q - vec2(0.0, 0.10)) / vec2(uRagdollV > 0.5 ? 0.90 : 0.95, uRagdollV > 0.5 ? 0.84 : 0.86));
               float facePoint = (1.0 - smoothstep(0.62, 1.04, maskDist)) * smoothstep(-0.35, 0.05, q.y) * smoothstep(-0.08, 0.25, hp.z);
+              if (uRagdollV > 0.5) {
+                // 布偶：中间保留一道白楔，面罩因此呈倒 V（鼻梁处最窄，眼周最宽）
+                float vBlaze = (1.0 - smoothstep(0.0, 0.16, abs(q.x) - max(0.0, (0.28 - q.y) * 0.50)))
+                             * smoothstep(-0.66, -0.08, q.y)
+                             * (1.0 - smoothstep(0.12, 0.34, q.y));
+                facePoint *= (1.0 - vBlaze * 0.92);
+                facePoint = smoothstep(0.08, 0.62, facePoint);
+              }
               point = max(point, facePoint * headZone);
             }
 
@@ -840,6 +851,7 @@ export class FurShaderSystem {
     setColor('uInner', p.inner);
     setColor('uPawColor', p.paw);
     this.uniforms.uStripes.value = p.stripes;
+    this.uniforms.uRagdollV.value = p.id === 'ragdoll' ? 1 : 0;
     this.uniforms.uMuzzle.value = p.muzzle;
     this.uniforms.uBib.value = p.bib;
     this.uniforms.uCalico.value = p.calico;
