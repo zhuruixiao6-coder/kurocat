@@ -513,11 +513,11 @@ function switchTab(nextTab: MenuTabId): void {
   }
 }
 
-const AUTHOR_QQ = '2361075845';
+const FEEDBACK_URL = 'https://github.com/zhuruixiao6-coder/kurocat/issues';
 let contactHintTimer: number | undefined;
 
 /**
- * 「检查更新」入口已经换成「联系作者」，这里保留一个空实现，
+ * 「检查更新」入口已经换成「问题反馈」，这里保留一个空实现，
  * 防止旧的更新状态事件把底部按钮的文字改回去。
  */
 function renderFooterUpdateState(_customLabel?: string, _ready = false): void {
@@ -543,24 +543,18 @@ function legacyCopyText(text: string): boolean {
   }
 }
 
-async function copyAuthorQQ(): Promise<void> {
-  let ok = false;
+async function openFeedback(): Promise<void> {
   try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(AUTHOR_QQ);
-      ok = true;
-    }
+    await invoke('open_release_page', { url: FEEDBACK_URL });
   } catch {
-    ok = false;
+    /* 打不开就算了，不做额外提示 */
   }
-  if (!ok) ok = legacyCopyText(AUTHOR_QQ);
-
   const hint = document.getElementById('contact-hint');
   if (!hint) return;
-  hint.textContent = ok ? `✓ 已复制 QQ ${AUTHOR_QQ}` : `QQ：${AUTHOR_QQ}`;
+  hint.textContent = '✓ 已打开反馈页';
   if (contactHintTimer) window.clearTimeout(contactHintTimer);
   contactHintTimer = window.setTimeout(() => {
-    hint.textContent = '📮 联系作者';
+    hint.textContent = '💬 问题反馈';
   }, 2200);
 }
 
@@ -1535,7 +1529,7 @@ async function bootstrap(): Promise<void> {
         closeMenu();
         break;
       case 'contact-author':
-        void copyAuthorQQ();
+        void openFeedback();
         break;
       case 'quit':
         void invoke('quit_app');

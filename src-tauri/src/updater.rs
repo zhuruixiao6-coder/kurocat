@@ -4,8 +4,8 @@ use std::sync::{Mutex, OnceLock};
 use tauri::{AppHandle, Emitter};
 
 const QIANYI_API_LATEST: &str = "https://qianyi.one/kurocat/releases/latest.json";
-const REPO_API_LATEST: &str = "https://api.github.com/repos/qianyiai/kurocat/releases/latest";
-const REPO_RELEASES_PAGE: &str = "https://github.com/qianyiai/kurocat/releases/latest";
+const REPO_API_LATEST: &str = "https://api.github.com/repos/zhuruixiao6-coder/kurocat/releases/latest";
+const REPO_RELEASES_PAGE: &str = "https://github.com/zhuruixiao6-coder/kurocat/releases/latest";
 
 pub const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -1199,11 +1199,11 @@ mod tests {
     #[test]
     fn http_url_parser_handles_github_endpoints() {
         let (https, host, port, path) =
-            parse_http_url("https://api.github.com/repos/qianyiai/kurocat/releases/latest").unwrap();
+            parse_http_url("https://api.github.com/repos/zhuruixiao6-coder/kurocat/releases/latest").unwrap();
         assert!(https);
         assert_eq!(host, "api.github.com");
         assert_eq!(port, 443);
-        assert_eq!(path, "/repos/qianyiai/kurocat/releases/latest");
+        assert_eq!(path, "/repos/zhuruixiao6-coder/kurocat/releases/latest");
 
         let (https2, host2, port2, path2) =
             parse_http_url("http://127.0.0.1:8080/dl?v=1").unwrap();
