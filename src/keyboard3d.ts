@@ -543,6 +543,10 @@ export interface KbPreset {
 
 export class KeyboardAndMouse3D {
   public readonly boardGroup = new THREE.Group();
+  /** 键下 RGB 灯层（加色混合，压在键帽之下、定位板之上） */
+  private rgbPlane: THREE.Mesh | null = null;
+  private rgbTime = 0;
+  private rgbState = { mode: 1, color: '#22e0e6', bright: 0.85, speed: 1 };
   public readonly mouseGroup = new THREE.Group();
   public readonly deskGroup = new THREE.Group();
 
@@ -887,6 +891,58 @@ export class KeyboardAndMouse3D {
     this.boardDisposables.push(chassisGeo);
     this.boardGroup.add(kbShadow, chassisMesh);
 
+    // —— 键下 RGB 灯层：位于定位板上方、键帽下方，只从键缝里透出来 ——
+    const rgbGeo = new THREE.PlaneGeometry(W - 0.085, D - 0.065);
+    const rgbMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uBright: { value: this.rgbState.bright },
+        uMode: { value: this.rgbState.mode },
+        uColA: { value: new THREE.Color(this.rgbState.color) },
+        uColB: { value: new THREE.Color('#2b6cf0') },
+      },
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime; uniform float uBright; uniform float uMode;
+        uniform vec3 uColA; uniform vec3 uColB;
+        varying vec2 vUv;
+        void main() {
+          float g;
+          if (uMode < 1.5) {
+            // 渐变：沿键盘横向缓慢流动的色相过渡
+            float t = vUv.x + sin(uTime * 0.25) * 0.08;
+            g = 0.62 + 0.38 * sin(t * 6.2832 + uTime * 0.6);
+          } else if (uMode < 2.5) {
+            // 呼吸：整片同色，亮度缓慢起伏
+            g = 0.45 + 0.55 * (0.5 + 0.5 * sin(uTime * 1.5));
+          } else {
+            // 流光：斜向扫过的高亮带
+            float band = fract(vUv.x * 1.15 - vUv.y * 0.35 - uTime * 0.22);
+            g = smoothstep(0.0, 0.28, band) * (1.0 - smoothstep(0.30, 0.72, band));
+            g = 0.12 + 0.88 * g;
+          }
+          vec3 col = mix(uColA, uColB, clamp(vUv.x * 0.85 + 0.08, 0.0, 1.0));
+          gl_FragColor = vec4(col * g * uBright, g * uBright * 0.85);
+        }
+      `,
+    });
+    const rgbPlane = new THREE.Mesh(rgbGeo, rgbMat);
+    rgbPlane.rotation.x = -Math.PI / 2;
+    rgbPlane.position.set(0, this.boardH + 0.004, 0.012);
+    rgbPlane.renderOrder = 3;
+    this.rgbPlane = rgbPlane;
+    this.boardDisposables.push(rgbGeo);
+    this.boardGroup.add(rgbPlane);
+
     // ROG 75% 右上角的屏幕 + 旋钮（参考图那块深色小面板）
     if (pal?.screen ?? isRog) {
       const sw = 3.35 * U;
@@ -1132,6 +1188,17 @@ export class KeyboardAndMouse3D {
     return out.set(0, 0.115, -0.05).applyMatrix4(this.mouseShape.matrixWorld);
   }
 
+  public setRgb(opts: Partial<{ mode: number; color: string; bright: number; speed: number }>): void {
+    if (opts.mode !== undefined) this.rgbState.mode = opts.mode;
+    if (opts.color) {
+      this.rgbState.color = opts.color;
+      const mat = this.rgbPlane?.material as THREE.ShaderMaterial | undefined;
+      if (mat) (mat.uniforms.uColA.value as THREE.Color).set(opts.color);
+    }
+    if (opts.bright !== undefined) this.rgbState.bright = Math.max(0, Math.min(1.5, opts.bright));
+    if (opts.speed !== undefined) this.rgbState.speed = Math.max(0.1, Math.min(3, opts.speed));
+  }
+
   public update(
     dt: number,
     leftDown: boolean,
@@ -1139,6 +1206,19 @@ export class KeyboardAndMouse3D {
     deskHopY: number,
     privacyAlpha: number,
   ): void {
+    // RGB 灯层动画：模式 0 = 关闭
+    if (this.rgbPlane) {
+      const on = this.rgbState.mode > 0 && this.rgbState.bright > 0.01;
+      this.rgbPlane.visible = on;
+      if (on) {
+        this.rgbTime += dt * this.rgbState.speed;
+        const mat = this.rgbPlane.material as THREE.ShaderMaterial;
+        mat.uniforms.uTime.value = this.rgbTime;
+        mat.uniforms.uBright.value = this.rgbState.bright;
+        mat.uniforms.uMode.value = this.rgbState.mode;
+      }
+    }
+
     if (deskHopY !== this.lastDeskHopY) {
       this.deskGroup.position.y = deskHopY;
       this.lastDeskHopY = deskHopY;

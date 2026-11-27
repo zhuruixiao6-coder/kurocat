@@ -33,6 +33,9 @@ interface AppSettings {
   mcpPort: number;
   keyboardLayout: KeyboardLayoutId;
   keyboardPreset?: string;
+  kbRgbMode?: number;
+  kbRgbBright?: number;
+  kbRgbSpeed?: number;
   keyboardOrientation: KeyboardOrientation;
   privacyPasswordGuard: boolean;
   tailKeyMode: TailKeyMode;
@@ -96,6 +99,9 @@ let settings: AppSettings = {
   mcpPort: 27420,
   keyboardLayout: '65',
   keyboardPreset: '',
+  kbRgbMode: 1,
+  kbRgbBright: 0.85,
+  kbRgbSpeed: 1,
   keyboardOrientation: 'cat',
   privacyPasswordGuard: true,
   tailKeyMode: 'smart',
@@ -966,6 +972,15 @@ function syncUI(): void {
   setCheck('chk-privacy', settings.privacyPasswordGuard !== false);
   setCheck('chk-bubbles', settings.showKeyBubbles);
   setCheck('chk-idle-play', settings.idlePlay !== false);
+  {
+    const modeNames = ['关闭', '渐变', '呼吸', '流光'];
+    const mEl = document.getElementById('kb-rgb-mode');
+    if (mEl) mEl.textContent = modeNames[settings.kbRgbMode ?? 1] ?? '渐变';
+    const bEl = document.getElementById('kb-rgb-bright');
+    if (bEl) bEl.textContent = (settings.kbRgbBright ?? 0.85) < 0.5 ? '低' : (settings.kbRgbBright ?? 0.85) < 1.0 ? '中' : '高';
+    const spEl = document.getElementById('kb-rgb-speed');
+    if (spEl) spEl.textContent = (settings.kbRgbSpeed ?? 1) < 0.7 ? '慢' : (settings.kbRgbSpeed ?? 1) > 1.4 ? '快' : '正常';
+  }
   const idleValEl = document.getElementById('val-idle-threshold');
   if (idleValEl) idleValEl.textContent = `${settings.idlePlaySec ?? 30} 秒`;
   setCheck('chk-fish-bubble', fishProfile?.bubble !== false);
@@ -1452,6 +1467,23 @@ async function bootstrap(): Promise<void> {
       case 'toggle-bubbles':
         void applySettingsPatch({ showKeyBubbles: !settings.showKeyBubbles });
         break;
+      case 'cycle-kb-rgb-mode': {
+        const next = ((settings.kbRgbMode ?? 1) + 1) % 4;
+        void applySettingsPatch({ kbRgbMode: next });
+        break;
+      }
+      case 'cycle-kb-rgb-bright': {
+        const cur = settings.kbRgbBright ?? 0.85;
+        const next = cur < 0.5 ? 0.85 : cur < 1.0 ? 1.25 : 0.35;
+        void applySettingsPatch({ kbRgbBright: next });
+        break;
+      }
+      case 'cycle-kb-rgb-speed': {
+        const cur = settings.kbRgbSpeed ?? 1;
+        const next = cur < 0.7 ? 1 : cur > 1.4 ? 0.45 : 1.9;
+        void applySettingsPatch({ kbRgbSpeed: next });
+        break;
+      }
       case 'gentle-demo':
         void invoke('trigger_gentle_demo');
         break;

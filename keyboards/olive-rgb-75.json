@@ -1,0 +1,13 @@
+{
+  "name": "橄榄绿 RGB（75%）",
+  "layout": "75",
+  "case": "#141614",
+  "bezel": "#1E211E",
+  "plate": "#0E100E",
+  "alpha": "#8FA23C",
+  "mod": "#3A3F38",
+  "accent": "#A7BD46",
+  "legendAlpha": "#20240F",
+  "legendDark": "#C9D2C4",
+  "screen": false
+}

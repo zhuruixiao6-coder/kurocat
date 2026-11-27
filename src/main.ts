@@ -50,6 +50,10 @@ interface AppSettings {
   mcpPort: number;
   keyboardLayout: KeyboardLayoutId;
   keyboardPreset?: string;
+  kbRgbMode?: number;
+  kbRgbColor?: string;
+  kbRgbBright?: number;
+  kbRgbSpeed?: number;
   keyboardOrientation: KeyboardOrientation;
   privacyPasswordGuard: boolean;
   tailKeyMode: TailKeyMode;
@@ -164,6 +168,10 @@ let settings: AppSettings = {
   mcpPort: 27420,
   keyboardLayout: '65',
   keyboardPreset: '',
+  kbRgbMode: 1,
+  kbRgbColor: '#22e0e6',
+  kbRgbBright: 0.85,
+  kbRgbSpeed: 1,
   keyboardOrientation: 'cat',
   privacyPasswordGuard: true,
   tailKeyMode: 'smart',
@@ -410,6 +418,7 @@ function syncEngine3DState(): void {
   engine3d.setKeyboardConfig(kbLayout, kbOrient);
   engine3d.setTailKeyConfig(tailMode, tailIds);
   engine3d.setIdlePlay(settings.idlePlay !== false, settings.idlePlaySec ?? 30);
+  engine3d.setKeyboardRgb(settings.kbRgbMode ?? 1, settings.kbRgbColor ?? '#22e0e6', settings.kbRgbBright ?? 0.85, settings.kbRgbSpeed ?? 1);
   engine3d.setPrivacyMode(privacyActive);
   engine3d.resize();
 }
@@ -1225,6 +1234,7 @@ async function bootstrap(): Promise<void> {
     settings = ev.payload;
     lastKnownLockState = settings.clickThroughLocked;
     engine3d?.setIdlePlay(settings.idlePlay !== false, settings.idlePlaySec ?? 30);
+    engine3d?.setKeyboardRgb(settings.kbRgbMode ?? 1, settings.kbRgbColor ?? '#22e0e6', settings.kbRgbBright ?? 0.85, settings.kbRgbSpeed ?? 1);
     syncMenuUI();
     if (prevLock !== null && prevLock !== settings.clickThroughLocked) {
       if (settings.clickThroughLocked) {

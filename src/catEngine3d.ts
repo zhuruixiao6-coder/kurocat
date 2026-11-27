@@ -1893,6 +1893,11 @@ export class KuroCatEngine3D {
     this.isIdlePacing = false;
   }
 
+  /** 键盘 RGB：mode 0=关 1=渐变 2=呼吸 3=流光 */
+  public setKeyboardRgb(mode: number, color: string, bright: number, speed: number): void {
+    this.desk.setRgb({ mode, color, bright, speed });
+  }
+
   public setGameActive(active: boolean): void {
     this.gameActive = Boolean(active);
   }
