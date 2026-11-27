@@ -1005,14 +1005,9 @@ function syncUI(): void {
         const ca = normHex(settings.kbColorA, '#22e0e6');
       const cb2 = normHex(settings.kbColorB, '#2b6cf0');
       const cc = normHex(settings.kbColorC, '#e14ec4');
-      const ea = document.getElementById('kb-color-a');
-      if (ea) { ea.textContent = `● ${ca}`; ea.style.color = ca; }
-      const eb = document.getElementById('kb-color-b');
-      if (eb) { eb.textContent = `● ${cb2}`; eb.style.color = cb2; }
-      const ec = document.getElementById('kb-color-c');
-      if (ec) { ec.textContent = `● ${cc}`; ec.style.color = cc; }
       const sw = document.getElementById('kb-color-swatch');
-      if (sw) sw.textContent = ca;
+      const panelOpen = !(document.getElementById('kb-color-panel') as HTMLElement | null)?.hidden;
+      if (sw) sw.textContent = `${ca} ${panelOpen ? '▴' : '▾'}`;
       document.querySelectorAll<HTMLElement>('.kb-swatch').forEach((el) => {
         const isSel = (el.dataset.kbcolor ?? '').toLowerCase() === ca;
         el.classList.toggle('is-selected', isSel);
@@ -1044,14 +1039,7 @@ function syncUI(): void {
         document.querySelectorAll<HTMLElement>('.kb-swatch').forEach((el) => {
           el.classList.toggle('is-selected', el === chip);
         });
-        const sw = document.getElementById('kb-color-swatch');
-        if (sw) sw.textContent = hex;
-        const pv = document.getElementById('kb-color-preview');
-        if (pv) pv.style.background = `linear-gradient(90deg, ${hex}, ${hex})`;
-        const hint = document.getElementById('kb-color-hint');
-        if (hint) hint.textContent = `纯色 ${hex}`;
-        const modeEl = document.getElementById('kb-color-mode');
-        if (modeEl) modeEl.textContent = '纯色';
+        syncColorUI(hex);
         void applySettingsPatch({ kbColorA: hex, kbColorMode: 1 });
       });
     }
@@ -1171,11 +1159,40 @@ function syncUI(): void {
   }
 }
 
+
+/** 只刷新配色相关 UI（色块高亮 / 标题 / 预览条），避免每次选色都整页 syncUI */
+function syncColorUI(hexRaw: unknown): void {
+  const hex = normHex(hexRaw, '#22e0e6');
+  const sw = document.getElementById('kb-color-swatch');
+  const panel = document.getElementById('kb-color-panel') as HTMLElement | null;
+  if (sw) sw.textContent = `${hex} ${panel && !panel.hidden ? '▴' : '▾'}`;
+  document.querySelectorAll<HTMLElement>('.kb-swatch').forEach((el) => {
+    el.classList.toggle('is-selected', (el.dataset.kbcolor ?? '').toLowerCase() === hex);
+  });
+  const pv = document.getElementById('kb-color-preview');
+  if (pv) pv.style.background = `linear-gradient(90deg, ${hex}, ${hex})`;
+  const hint = document.getElementById('kb-color-hint');
+  if (hint) hint.textContent = `纯色 ${hex}`;
+  const modeEl = document.getElementById('kb-color-mode');
+  if (modeEl) modeEl.textContent = '纯色';
+}
+
 async function applySettingsPatch(patch: Partial<AppSettings>): Promise<void> {
+  // 只改颜色时走轻量路径：避免每次点击都重建整份菜单（拖拽时代的卡顿主因）
+  const keys = Object.keys(patch);
+  const colorOnly = keys.length > 0 && keys.every((k) => k.startsWith('kbColor'));
+  const same = keys.every((k) => (settings as any)[k] === (patch as any)[k]);
+  if (same) return;
+
   settings = { ...settings, ...patch };
-  syncUI();
+  if (colorOnly) {
+    syncColorUI((patch as Partial<AppSettings>).kbColorA);
+  } else {
+    syncUI();
+  }
   settings = await invoke<AppSettings>('update_settings', { patch: settings });
-  syncUI();
+  if (colorOnly) syncColorUI(settings.kbColorA);
+  else syncUI();
 }
 
 async function copyText(text: string): Promise<void> {
@@ -1577,6 +1594,14 @@ async function bootstrap(): Promise<void> {
       case 'toggle-bubbles':
         void applySettingsPatch({ showKeyBubbles: !settings.showKeyBubbles });
         break;
+      case 'toggle-color-panel': {
+        const panel = document.getElementById('kb-color-panel') as HTMLElement | null;
+        if (panel) panel.hidden = !panel.hidden;
+        const sw = document.getElementById('kb-color-swatch');
+        const ca = normHex(settings.kbColorA, '#22e0e6');
+        if (sw) sw.textContent = `${ca} ${panel?.hidden ? '▾' : '▴'}`;
+        break;
+      }
       case 'cycle-kb-color-mode':
         void applySettingsPatch({ kbColorMode: ((settings.kbColorMode ?? 0) + 1) % 3 });
         break;
