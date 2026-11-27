@@ -937,7 +937,7 @@ export class KeyboardAndMouse3D {
     });
     const rgbPlane = new THREE.Mesh(rgbGeo, rgbMat);
     rgbPlane.rotation.x = -Math.PI / 2;
-    rgbPlane.position.set(0, this.boardH + 0.004, 0.012);
+    rgbPlane.position.set(0, this.boardH + 0.0135, 0.012); // 定位板顶面 = boardH+0.012，灯层必须在其之上、键帽之下
     rgbPlane.renderOrder = 3;
     this.rgbPlane = rgbPlane;
     this.boardDisposables.push(rgbGeo);

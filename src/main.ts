@@ -164,14 +164,14 @@ let settings: AppSettings = {
   keySoundStyle: 'mechanical',
   autostart: false,
   catBreed: 'black',
-  mcpEnabled: false,
+  mcpEnabled: true,
   mcpPort: 27420,
   keyboardLayout: '65',
   keyboardPreset: '',
   kbRgbMode: 1,
   kbRgbColor: '#22e0e6',
-  kbRgbBright: 0.85,
-  kbRgbSpeed: 1,
+  kbRgbBright: -1,
+  kbRgbSpeed: 0,
   keyboardOrientation: 'cat',
   privacyPasswordGuard: true,
   tailKeyMode: 'smart',
@@ -417,8 +417,16 @@ function syncEngine3DState(): void {
   engine3d.setGameActive(gameActive);
   engine3d.setKeyboardConfig(kbLayout, kbOrient);
   engine3d.setTailKeyConfig(tailMode, tailIds);
-  engine3d.setIdlePlay(settings.idlePlay !== false, settings.idlePlaySec ?? 30);
-  engine3d.setKeyboardRgb(settings.kbRgbMode ?? 1, settings.kbRgbColor ?? '#22e0e6', settings.kbRgbBright ?? 0.85, settings.kbRgbSpeed ?? 1);
+  const idleSec = settings.idlePlaySec ?? 30;
+  engine3d.setIdlePlay(settings.idlePlay !== false && idleSec > 0, idleSec > 0 ? idleSec : 30);
+  const rgbBright = settings.kbRgbBright ?? -1;
+  const rgbSpeed = settings.kbRgbSpeed ?? 0;
+  engine3d.setKeyboardRgb(
+    settings.kbRgbMode ?? 1,
+    settings.kbRgbColor ?? '#22e0e6',
+    rgbBright < 0 ? 0.85 : rgbBright,
+    rgbSpeed <= 0 ? 1 : rgbSpeed,
+  );
   engine3d.setPrivacyMode(privacyActive);
   engine3d.resize();
 }
@@ -1233,8 +1241,18 @@ async function bootstrap(): Promise<void> {
     const prevLock = lastKnownLockState;
     settings = ev.payload;
     lastKnownLockState = settings.clickThroughLocked;
-    engine3d?.setIdlePlay(settings.idlePlay !== false, settings.idlePlaySec ?? 30);
-    engine3d?.setKeyboardRgb(settings.kbRgbMode ?? 1, settings.kbRgbColor ?? '#22e0e6', settings.kbRgbBright ?? 0.85, settings.kbRgbSpeed ?? 1);
+    {
+      const sec = settings.idlePlaySec ?? 30;
+      engine3d?.setIdlePlay(settings.idlePlay !== false && sec > 0, sec > 0 ? sec : 30);
+      const br = settings.kbRgbBright ?? -1;
+      const sp = settings.kbRgbSpeed ?? 0;
+      engine3d?.setKeyboardRgb(
+        settings.kbRgbMode ?? 1,
+        settings.kbRgbColor ?? '#22e0e6',
+        br < 0 ? 0.85 : br,
+        sp <= 0 ? 1 : sp,
+      );
+    }
     syncMenuUI();
     if (prevLock !== null && prevLock !== settings.clickThroughLocked) {
       if (settings.clickThroughLocked) {

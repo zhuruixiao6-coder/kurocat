@@ -8,8 +8,7 @@ fn default_cat_breed() -> String {
 }
 
 fn default_mcp_enabled() -> bool {
-    // 默认关闭：仅在本机回环端口提供服务，首次启用需用户显式确认
-    false
+    true
 }
 
 fn default_privacy_password_guard() -> bool {

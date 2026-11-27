@@ -1,8 +1,8 @@
 {
   "name": "kuro-cat-pet",
-  "version": "5.9.17",
+  "version": "5.9.21",
   "private": true,
-  "description": "KuroCat desktop pet - typing cat companion",
+  "description": "Adorable transparent black cat desktop typing & mouse companion for Windows and macOS",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -23,10 +23,5 @@
     "@types/three": "^0.187.0",
     "typescript": "^5.7.2",
     "vite": "^6.0.7"
-  },
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/zhuruixiao6-coder/kurocat.git"
   }
 }

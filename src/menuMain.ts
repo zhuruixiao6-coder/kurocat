@@ -95,13 +95,13 @@ let settings: AppSettings = {
   soundEnabled: true,
   autostart: false,
   catBreed: 'black',
-  mcpEnabled: false,
+  mcpEnabled: true,
   mcpPort: 27420,
   keyboardLayout: '65',
   keyboardPreset: '',
   kbRgbMode: 1,
-  kbRgbBright: 0.85,
-  kbRgbSpeed: 1,
+  kbRgbBright: -1,
+  kbRgbSpeed: 0,
   keyboardOrientation: 'cat',
   privacyPasswordGuard: true,
   tailKeyMode: 'smart',
@@ -523,7 +523,7 @@ function switchTab(nextTab: MenuTabId): void {
   }
 }
 
-const FEEDBACK_URL = 'https://github.com/zhuruixiao6-coder/kurocat/issues';
+const CONTACT_QQ = '2361075845'; // 联系方式：需要改号只改这一行
 let contactHintTimer: number | undefined;
 
 /**
@@ -553,18 +553,24 @@ function legacyCopyText(text: string): boolean {
   }
 }
 
-async function openFeedback(): Promise<void> {
+async function copyContactQQ(): Promise<void> {
+  let ok = false;
   try {
-    await invoke('open_release_page', { url: FEEDBACK_URL });
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(CONTACT_QQ);
+      ok = true;
+    }
   } catch {
-    /* 打不开就算了，不做额外提示 */
+    ok = false;
   }
+  if (!ok) ok = legacyCopyText(CONTACT_QQ);
+
   const hint = document.getElementById('contact-hint');
   if (!hint) return;
-  hint.textContent = '✓ 已打开反馈页';
+  hint.textContent = ok ? `✓ 已复制 QQ ${CONTACT_QQ}` : `QQ：${CONTACT_QQ}`;
   if (contactHintTimer) window.clearTimeout(contactHintTimer);
   contactHintTimer = window.setTimeout(() => {
-    hint.textContent = '💬 问题反馈';
+    hint.textContent = '📮 联系作者';
   }, 2200);
 }
 
@@ -974,12 +980,20 @@ function syncUI(): void {
   setCheck('chk-idle-play', settings.idlePlay !== false);
   {
     const modeNames = ['关闭', '渐变', '呼吸', '流光'];
+    const rgbMode = settings.kbRgbMode ?? 1;
     const mEl = document.getElementById('kb-rgb-mode');
-    if (mEl) mEl.textContent = modeNames[settings.kbRgbMode ?? 1] ?? '渐变';
+    if (mEl) mEl.textContent = `${rgbMode > 0 ? '✓' : '○'} ${modeNames[rgbMode] ?? '渐变'}`;
+    const bright = settings.kbRgbBright ?? -1;
     const bEl = document.getElementById('kb-rgb-bright');
-    if (bEl) bEl.textContent = (settings.kbRgbBright ?? 0.85) < 0.5 ? '低' : (settings.kbRgbBright ?? 0.85) < 1.0 ? '中' : '高';
+    if (bEl) bEl.textContent = bright < 0 ? '○ 默认' : `✓ ${bright < 0.5 ? '低' : bright < 1.0 ? '中' : '高'}`;
+    const spd = settings.kbRgbSpeed ?? 0;
     const spEl = document.getElementById('kb-rgb-speed');
-    if (spEl) spEl.textContent = (settings.kbRgbSpeed ?? 1) < 0.7 ? '慢' : (settings.kbRgbSpeed ?? 1) > 1.4 ? '快' : '正常';
+    if (spEl) spEl.textContent = spd <= 0 ? '○ 默认' : `✓ ${spd < 0.7 ? '慢' : spd > 1.4 ? '快' : '正常'}`;
+    const thEl = document.getElementById('val-idle-threshold');
+    if (thEl) {
+      const sec = settings.idlePlaySec ?? 30;
+      thEl.textContent = sec > 0 ? `✓ ${sec} 秒` : '○ 关闭';
+    }
   }
   const idleValEl = document.getElementById('val-idle-threshold');
   if (idleValEl) idleValEl.textContent = `${settings.idlePlaySec ?? 30} 秒`;
@@ -1473,14 +1487,16 @@ async function bootstrap(): Promise<void> {
         break;
       }
       case 'cycle-kb-rgb-bright': {
-        const cur = settings.kbRgbBright ?? 0.85;
-        const next = cur < 0.5 ? 0.85 : cur < 1.0 ? 1.25 : 0.35;
+        const steps = [-1, 0.35, 0.85, 1.25];
+        const cur = settings.kbRgbBright ?? -1;
+        const next = steps[(steps.indexOf(cur) + 1) % steps.length] ?? -1;
         void applySettingsPatch({ kbRgbBright: next });
         break;
       }
       case 'cycle-kb-rgb-speed': {
-        const cur = settings.kbRgbSpeed ?? 1;
-        const next = cur < 0.7 ? 1 : cur > 1.4 ? 0.45 : 1.9;
+        const steps = [0, 0.45, 1, 1.9];
+        const cur = settings.kbRgbSpeed ?? 0;
+        const next = steps[(steps.indexOf(cur) + 1) % steps.length] ?? 0;
         void applySettingsPatch({ kbRgbSpeed: next });
         break;
       }
@@ -1491,7 +1507,7 @@ async function bootstrap(): Promise<void> {
         void applySettingsPatch({ idlePlay: settings.idlePlay === false });
         break;
       case 'cycle-idle-threshold': {
-        const steps = [15, 30, 60, 120];
+        const steps = [0, 15, 30, 60, 120];
         const cur = settings.idlePlaySec ?? 30;
         const next = steps[(steps.indexOf(cur) + 1) % steps.length] ?? 30;
         void applySettingsPatch({ idlePlaySec: next });
@@ -1564,20 +1580,9 @@ async function bootstrap(): Promise<void> {
           closeMenu();
         }
         break;
-      case 'toggle-mcp': {
-        if (settings.mcpEnabled) {
-          void applySettingsPatch({ mcpEnabled: false });
-          break;
-        }
-        // 启用前明确告知：会在本机 127.0.0.1 上开一个端口给 AI 客户端用
-        const ok = window.confirm(
-          `开启 MCP 服务会在本机 127.0.0.1:${settings.mcpPort} 上监听一个本地端口，\n` +
-            '供 Claude / Cursor 等 AI 客户端调用（仅本机可访问，不对外网开放）。\n\n' +
-            '确定开启吗？',
-        );
-        if (ok) void applySettingsPatch({ mcpEnabled: true });
+      case 'toggle-mcp':
+        void applySettingsPatch({ mcpEnabled: !settings.mcpEnabled });
         break;
-      }
       case 'copy-mcp':
         void copyMcpConfig();
         break;
@@ -1592,7 +1597,7 @@ async function bootstrap(): Promise<void> {
         closeMenu();
         break;
       case 'contact-author':
-        void openFeedback();
+        void copyContactQQ();
         break;
       case 'quit':
         void invoke('quit_app');
