@@ -908,6 +908,8 @@ async fn start_pet_drag(app: AppHandle) -> bool {
                                     SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
                                 );
                             }
+                            // 清掉透明窗口移动时的画布残影（双猫拖影）
+                            force_window_repaint(hwnd_raw);
                         }
                     }
                 }
@@ -924,6 +926,19 @@ async fn start_pet_drag(app: AppHandle) -> bool {
     {
         let _ = app;
         false
+    }
+}
+
+/// 透明 WebView2 窗口移动后，合成层可能残留上一帧像素（表现为"两只猫重叠"的拖影）。
+/// 强制整窗失效并立即重绘，清掉残影。
+#[cfg(windows)]
+fn force_window_repaint(hwnd_raw: isize) {
+    use windows_sys::Win32::Foundation::{HWND, RECT};
+    use windows_sys::Win32::Graphics::Gdi::InvalidateRect;
+    unsafe {
+        let rc = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+        // bErase=TRUE，整窗标记失效；Windows 下次消息循环会重绘，清掉合成层残影
+        let _ = InvalidateRect(hwnd_raw as HWND, &rc, 1);
     }
 }
 
@@ -1040,6 +1055,10 @@ fn move_pet_by(app: AppHandle, state: State<'_, AppState>, dx: i32, dy: i32) -> 
                 Err(_) => {
                     let _ = win.set_position(PhysicalPosition::new(nx, ny));
                 }
+            }
+            // 清掉透明窗口移动时的画布残影（双猫拖影）
+            if let Ok(h) = win.hwnd() {
+                force_window_repaint(h.0 as isize);
             }
         }
     }

@@ -3595,7 +3595,7 @@ export class KuroCatEngine3D {
       const wantTuck = !activeForMouse && !activeForKey ? 1 : 0;
       paw.tuckWeight += (wantTuck - paw.tuckWeight) * approach(wantTuck ? 6.5 : 22, dt);
 
-      this.tmpPawLocal.set(paw.side * 0.24, 0.16 - this.sleepAmt * 0.06, 0.54);
+      this.tmpPawLocal.set(paw.side * 0.24, 0.205 - this.sleepAmt * 0.05, 0.40); // 抬到键帽之上并退到键盘前沿之外，避免插进第一排键帽
       const tuckHome = this.attachLocal(this.tmpPawLocal, this.tmpV3);
 
       if (activeForMouse) {

@@ -55,7 +55,7 @@ const CAMERA: Record<string, CamPreset> = {
   back: { pos: [2.30, 1.98, -2.05], target: [0, 1.16, -0.04], fov: 34 },
   paw: { pos: [0.45, 0.80, 1.75], target: [0, 0.14, 0.52], fov: 30 },
   floor: { pos: [0.40, 1.55, 3.30], target: [0, 0.05, 0.08], fov: 36 },
-  prop: { pos: [-0.02, 1.02, 2.45], target: [-0.46, 0.38, 0.30], fov: 28 },
+  prop: { pos: [-0.04, 1.06, 2.92], target: [-0.28, 0.34, 0.36], fov: 26 },
   fx: { pos: [0.30, 1.55, 3.35], target: [0, 1.16, 0], fov: 30 },
 };
 
@@ -294,6 +294,11 @@ export class AccPreview {
       // 半身像没有手臂，把爪饰摆在「收爪」位置，并套上爪子的比例
       group.position.set(-0.24, 0.16, 0.54);
       group.scale.set(0.126, 0.080, 0.118);
+    }
+    if (group && item.slot === 'prop') {
+      // 道具和半身像贴太近会看着像穿模：整体向镜头前挪、略微外移
+      group.position.z += 0.14;
+      group.position.x -= 0.05;
     }
     if (group) {
       const parent =
