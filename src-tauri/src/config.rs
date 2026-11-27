@@ -9,6 +9,15 @@ fn default_cat_breed() -> String {
 
 fn default_idle_play() -> bool { true }
 fn default_idle_play_sec() -> u32 { 30 }
+fn default_walk_mode() -> String { "off".to_string() }
+
+/// 归一化自由走动模式：仅允许 off / roam / follow
+pub fn normalize_walk_mode(mode: &str) -> String {
+    match mode {
+        "roam" | "follow" => mode.to_string(),
+        _ => "off".to_string(),
+    }
+}
 fn default_kb_rgb_mode() -> u8 { 1 }
 fn default_kb_rgb_color() -> String { "#22e0e6".to_string() }
 fn default_kb_rgb_bright() -> f32 { 1.15 }
@@ -222,6 +231,8 @@ pub struct AppSettings {
     pub idle_play: bool,
     #[serde(default = "default_idle_play_sec")]
     pub idle_play_sec: u32,
+    #[serde(default = "default_walk_mode")]
+    pub walk_mode: String,
     #[serde(default = "default_kb_rgb_mode")]
     pub kb_rgb_mode: u8,
     #[serde(default = "default_kb_rgb_color")]
@@ -279,6 +290,7 @@ impl Default for AppSettings {
             keyboard_preset: String::new(),
             idle_play: default_idle_play(),
             idle_play_sec: default_idle_play_sec(),
+            walk_mode: default_walk_mode(),
             kb_rgb_mode: default_kb_rgb_mode(),
             kb_rgb_color: default_kb_rgb_color(),
             kb_rgb_bright: default_kb_rgb_bright(),

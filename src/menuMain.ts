@@ -26,6 +26,7 @@ interface AppSettings {
   showKeyBubbles: boolean;
   idlePlay?: boolean;
   idlePlaySec?: number;
+  walkMode?: 'off' | 'roam' | 'follow';
   soundEnabled: boolean;
   autostart: boolean;
   catBreed: string;
@@ -93,6 +94,7 @@ let settings: AppSettings = {
   showKeyBubbles: true,
   idlePlay: true,
   idlePlaySec: 30,
+  walkMode: 'off',
   soundEnabled: true,
   autostart: false,
   catBreed: 'black',
@@ -1006,6 +1008,12 @@ function syncUI(): void {
   }
   const idleValEl = document.getElementById('val-idle-threshold');
   if (idleValEl) idleValEl.textContent = `${settings.idlePlaySec ?? 30} 秒`;
+  {
+    const walkNames: Record<string, string> = { off: '关闭', roam: '自主巡逻', follow: '跟随鼠标' };
+    const walkEl = document.getElementById('val-walk-mode');
+    const wm = settings.walkMode ?? 'off';
+    if (walkEl) walkEl.textContent = wm === 'off' ? '关闭' : `✓ ${walkNames[wm] ?? '关闭'}`;
+  }
   setCheck('chk-fish-bubble', fishProfile?.bubble !== false);
   setCheck('chk-lock', settings.clickThroughLocked);
   setCheck('chk-sound', settings.soundEnabled);
@@ -1529,6 +1537,13 @@ async function bootstrap(): Promise<void> {
         const cur = settings.idlePlaySec ?? 30;
         const next = steps[(steps.indexOf(cur) + 1) % steps.length] ?? 30;
         void applySettingsPatch({ idlePlaySec: next });
+        break;
+      }
+      case 'cycle-walk-mode': {
+        const steps: Array<'off' | 'roam' | 'follow'> = ['off', 'roam', 'follow'];
+        const cur = settings.walkMode ?? 'off';
+        const next = steps[(steps.indexOf(cur) + 1) % steps.length] ?? 'off';
+        void applySettingsPatch({ walkMode: next });
         break;
       }
       case 'toggle-fish-bubble':

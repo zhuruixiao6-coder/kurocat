@@ -39,6 +39,7 @@ interface AppSettings {
   showKeyBubbles: boolean;
   idlePlay?: boolean;
   idlePlaySec?: number;
+  walkMode?: 'off' | 'roam' | 'follow';
   soundEnabled: boolean;
   keySoundEnabled?: boolean;
   keySoundVolume?: number;
@@ -159,6 +160,7 @@ let settings: AppSettings = {
   showKeyBubbles: true,
   idlePlay: true,
   idlePlaySec: 30,
+  walkMode: 'off',
   soundEnabled: true,
   keySoundEnabled: true,
   keySoundVolume: 55,
@@ -421,6 +423,7 @@ function syncEngine3DState(): void {
   engine3d.setTailKeyConfig(tailMode, tailIds);
   const idleSec = settings.idlePlaySec ?? 30;
   engine3d.setIdlePlay(settings.idlePlay !== false && idleSec > 0, idleSec > 0 ? idleSec : 30);
+  engine3d.setWalkMode(settings.walkMode ?? 'off');
   const rgbBright = settings.kbRgbBright ?? 1;
   const rgbSpeed = settings.kbRgbSpeed ?? 1;
   engine3d.setKeyboardLightsOff(settings.kbLightsOff !== false);
@@ -488,6 +491,15 @@ function activateRenderEngine(): void {
     loading3dPromise = import('./catEngine3d')
       .then(({ KuroCatEngine3D }) => {
         engine3d = new KuroCatEngine3D(canvas3d, { embedded: false });
+        // 自由走动：注册窗口位移回调（Rust 端做边界约束），并校准世界单位→像素换算
+        engine3d.setWalkMoveHandler((dx: number, dy: number) => {
+          void invoke('move_pet_by', { dx, dy }).catch(() => {});
+        });
+        void (async () => {
+          const isUlw = await invoke<boolean>('is_win7_ulw_mode').catch(() => false);
+          engine3d?.setWalkMode(settings.walkMode ?? 'off', !isUlw);
+          engine3d?.setWalkScale((await getCurrentWindow().innerSize().catch(() => ({ width: 420, height: 440 }))).width / 3.12);
+        })();
         void loadKeyboardPresets();
         window.addEventListener('resize', () => engine3d?.resize());
         if (fishProfile) syncCollectibles(fishProfile);
@@ -1247,6 +1259,7 @@ async function bootstrap(): Promise<void> {
     {
       const sec = settings.idlePlaySec ?? 30;
       engine3d?.setIdlePlay(settings.idlePlay !== false && sec > 0, sec > 0 ? sec : 30);
+      engine3d?.setWalkMode(settings.walkMode ?? 'off');
       const br = settings.kbRgbBright ?? 1;
       const sp = settings.kbRgbSpeed ?? 1;
       engine3d?.setKeyboardLightsOff(settings.kbLightsOff !== false);

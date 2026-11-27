@@ -75,7 +75,7 @@ interface Fx3D {
   baseX: number;
 }
 
-type PlayKind3D = 'tailChase' | 'pounce' | 'swat' | 'circle' | 'stretch' | 'yawn' | 'groom' | 'bunt' | 'softBlink';
+type PlayKind3D = 'tailChase' | 'pounce' | 'swat' | 'circle' | 'stretch' | 'yawn' | 'groom' | 'bunt' | 'softBlink' | 'rollOver' | 'wave' | 'dance' | 'laserChase';
 
 interface IdleAct3D {
   kind: 'tilt' | 'ear' | 'slowBlink' | 'look' | 'tail';
@@ -794,6 +794,22 @@ export class KuroCatEngine3D {
   private playArmR = 0;
   private playReach = 0;
   private playSwing = 0;
+
+  // —— 自由走动（roam / follow）——
+  private walkMode: 'off' | 'roam' | 'follow' = 'off';
+  private walkSupported = true;            // Win7 ULW 下置 false
+  private walkDir: -1 | 1 = 1;             // 朝向：1 面向右 / -1 面向左
+  private walkFacing = 1;                  // 平滑后的朝向（-1..1）
+  private walkPhase = 0;                   // 步态相位
+  private walkMoving = false;              // 是否正在移动（用于步态幅度）
+  private walkMoveUntil = 0;               // 当前移动段结束时间
+  private walkRestUntil = 0;               // 休息段结束时间
+  private walkNextDecision = 0;            // 下次决策时间
+  private walkStepAccum = 0;               // 累计位移（物理像素）
+  private walkSpeed = 26;                  // 走路速度 px/s
+  private walkPxPerUnit = 100;             // 世界单位→像素换算（由 setWalkScale 校准）
+  private walkOnMove: ((dx: number, dy: number) => void) | null = null;
+  private walkLastMoveAt = 0;              // 上一次成功推动窗口的时间
   private handRest = new Map<number, THREE.Vector3>();
   private tmpSkinA = new THREE.Vector3();
   private tmpSkinB = new THREE.Vector3();
@@ -1504,7 +1520,7 @@ export class KuroCatEngine3D {
 
   /** 每帧：把动作参数写进骨骼（只写用到的关节，其余保持 rest） */
   private applyRig(): void {
-    const on = this.playActive;
+    const on = this.playActive || this.walkMoving;
     this.rig.spine.rotation.y = on ? this.playTwist * 0.45 : 0;
     this.rig.chest.rotation.y = on ? this.playTwist * 0.55 : 0;
     this.rig.spine.rotation.z = on ? this.playLean * 0.25 : 0;
@@ -2137,6 +2153,132 @@ export class KuroCatEngine3D {
     if (!enabled) this.stopIdlePlay();
   }
 
+  /**
+   * 自由走动：off 关闭 / roam 自主巡逻 / follow 跟随鼠标横向位置。
+   * supported=false（Win7 ULW）时强制关闭。
+   */
+  public setWalkMode(mode: 'off' | 'roam' | 'follow', supported = true): void {
+    this.walkSupported = supported;
+    const next = supported ? mode : 'off';
+    if (next === this.walkMode) return;
+    this.walkMode = next;
+    this.walkMoving = false;
+    this.walkPhase = 0;
+    this.walkStepAccum = 0;
+    this.walkNextDecision = this.elapsed + 0.8;
+    if (next === 'off') {
+      this.walkFacing = 1;
+      this.catRoot.rotation.y = 0;
+      this.wakeRendering();
+    }
+  }
+
+  public getWalkMode(): 'off' | 'roam' | 'follow' {
+    return this.walkMode;
+  }
+
+  /** 注册窗口位移回调；引擎只负责算 dx/dy，实际移动由宿主（Tauri 命令）执行 */
+  public setWalkMoveHandler(fn: ((dx: number, dy: number) => void) | null): void {
+    this.walkOnMove = fn;
+  }
+
+  /** 校准世界单位→物理像素的换算（窗口宽度 / 世界可见宽度） */
+  public setWalkScale(pxPerUnit: number): void {
+    if (pxPerUnit > 0 && Number.isFinite(pxPerUnit)) this.walkPxPerUnit = pxPerUnit;
+  }
+
+  /** 每帧推进自由走动：状态决策 + 步态动画 + 朝向翻转 + 位移回调 */
+  private updateWalk(t: number, dt: number): void {
+    const active = this.walkMode !== 'off' && this.walkSupported && !!this.walkOnMove;
+    if (!active) {
+      // 平滑归位朝向到正面（rotation.y → 0）
+      if (Math.abs(this.catRoot.rotation.y) > 0.005) {
+        this.catRoot.rotation.y += (0 - this.catRoot.rotation.y) * approach(6, dt);
+      } else {
+        this.catRoot.rotation.y = 0;
+      }
+      this.walkFacing = 1;
+      return;
+    }
+    // 打字 / 拖拽 / 睡眠 / 隐私 / 玩耍动作时不走动（保持原有行为）
+    const typing = t - this.lastKey < 1.1 || this.paws.L.down || this.paws.R.down;
+    const busy = typing || this.asleep || this.privacyMode || this.petting ||
+      this.playActive || this.isCross || this.leftMouseDown || this.rightMouseDown;
+    if (busy) {
+      this.walkMoving = false;
+      return;
+    }
+
+    if (this.walkMode === 'roam') {
+      // 自主巡逻：走一段 → 停一段 → 换方向
+      if (t >= this.walkMoveUntil && t >= this.walkRestUntil && t >= this.walkNextDecision) {
+        // 决定下一段
+        const willMove = Math.random() < 0.68;
+        if (willMove) {
+          this.walkDir = Math.random() < 0.5 ? -1 : 1;
+          this.walkMoving = true;
+          this.walkMoveUntil = t + 1.6 + Math.random() * 2.8;
+          this.walkRestUntil = this.walkMoveUntil;
+          this.walkNextDecision = this.walkMoveUntil + 0.4;
+        } else {
+          this.walkMoving = false;
+          this.walkRestUntil = t + 1.2 + Math.random() * 2.6;
+          this.walkNextDecision = this.walkRestUntil + 0.2;
+        }
+      } else if (t >= this.walkMoveUntil && this.walkMoving) {
+        this.walkMoving = false;
+        this.walkRestUntil = t + 0.5 + Math.random() * 1.5;
+        this.walkNextDecision = this.walkRestUntil + 0.1;
+      }
+    } else {
+      // 跟随鼠标：根据光标横向位置决定方向与是否移动
+      const cx = clamp(this.cursorNdc.x, -1.6, 1.6);
+      const deadZone = 0.18;
+      if (Math.abs(cx) < deadZone) {
+        this.walkMoving = false;
+      } else {
+        this.walkDir = cx > 0 ? 1 : -1;
+        this.walkMoving = true;
+      }
+      this.walkNextDecision = t;
+    }
+
+    // 朝向：walkDir=1 面向右（rotation.y ≈ +?），-1 面向左
+    // three.js 里模型默认面向 +Z（观众），绕 Y 转 ±(接近 π/2) 呈现侧身
+    const targetFacing = this.walkMoving ? this.walkDir : this.walkFacing;
+    this.walkFacing += (targetFacing - this.walkFacing) * approach(4.5, dt);
+    this.catRoot.rotation.y = this.walkFacing * 0.62; // 约 ±35°，保留正面可爱感
+
+    if (this.walkMoving) {
+      // 步态相位（走动时加快）
+      this.walkPhase += dt * 7.2;
+      // 猫本体保持在窗口中心附近做轻微呼吸位移动画（±0.02，纯视觉）
+      this.catRoot.position.x = this.homePos.x + this.walkDir * 0.02 * Math.sin(this.walkPhase * 0.5);
+      // 窗口以恒定速度在桌面平移（Rust 端做边界约束）。累计到 ≥1px 再推，减少 IPC 频率。
+      const pxDx = this.walkDir * this.walkSpeed * dt;
+      this.walkStepAccum += pxDx;
+      if (Math.abs(this.walkStepAccum) >= 1 && t - this.walkLastMoveAt > 0.016) {
+        const push = Math.round(this.walkStepAccum);
+        this.walkStepAccum -= push;
+        try {
+          this.walkOnMove?.(push, 0);
+          this.walkLastMoveAt = t;
+        } catch (_) { /* ignore */ }
+      }
+      // 步态动画：四肢交替 + 身体轻起伏，尾巴反向配重
+      const step = Math.sin(this.walkPhase);
+      this.playArmL = Math.max(0, step) * 0.075;
+      this.playArmR = Math.max(0, -step) * 0.075;
+      this.playSquash = 0.02 * Math.abs(Math.sin(this.walkPhase * 2));
+      this.playLean = this.walkDir * 0.05 * Math.abs(step);
+      this.playHeadYaw = this.walkDir * 0.10;
+      this.playTailWag = 0.35 + 0.25 * Math.abs(step);
+    } else {
+      // 停下时步态归零（让 applyRig/骨骼平滑回落）
+      this.walkPhase = 0;
+    }
+  }
+
   private stopIdlePlay(): void {
     this.playActive = false;
     this.gentleDemo = false;
@@ -2162,6 +2304,7 @@ export class KuroCatEngine3D {
     const canPlay =
       !this.asleep &&
       !this.privacyMode &&
+      this.walkMode === 'off' &&
       (this.gentleDemo || (this.playEnabled && idle >= this.playThreshold));
 
     if (!canPlay) {
@@ -2195,7 +2338,7 @@ export class KuroCatEngine3D {
   }
 
   private startPlayAct(t: number, forced?: PlayKind3D): void {
-    const all: PlayKind3D[] = ['tailChase', 'pounce', 'swat', 'circle', 'stretch', 'yawn'];
+    const all: PlayKind3D[] = ['tailChase', 'pounce', 'swat', 'circle', 'stretch', 'yawn', 'rollOver', 'wave', 'dance', 'laserChase'];
     // 最近两次不重复，避免短时间内来回同一套
     const pool = all.filter((k) => !this.playHistory.includes(k));
     const kind = forced ?? (pool.length ? pool : all)[Math.floor(Math.random() * (pool.length || all.length))];
@@ -2211,6 +2354,10 @@ export class KuroCatEngine3D {
       groom: 4.6,
       bunt: 2.8,
       softBlink: 2.4,
+      rollOver: 3.4,
+      wave: 2.8,
+      dance: 4.4,
+      laserChase: 3.8,
     };
     this.playAct = { kind, t0: t, dur: dur[kind] };
     this.playLean = 0;
@@ -2492,6 +2639,149 @@ export class KuroCatEngine3D {
           this.playSquint = 1.0 * (1 - c);
           this.playHeadPitch = 0.05 * (1 - c);
           this.playTailWag = 0.25 * (1 - c);
+        }
+        break;
+      }
+      case 'rollOver': {
+        // 打滚翻肚皮：侧身倒下 → 脊背扭转露出肚皮 → 四爪朝天蹬两下 → 翻回趴好
+        if (k < 0.24) {
+          // 预备：先歪头看一眼，身体慢慢侧倾
+          const c = easeInOut(k / 0.24);
+          this.playLean = 0.34 * c;
+          this.playTwist = 0.30 * c;
+          this.playHeadYaw = -0.20 * c;
+          this.playTailWag = 0.35 * c;
+        } else if (k < 0.52) {
+          // 翻身：身体扭到最大，肚皮朝上，头跟着仰
+          const c = easeInOut((k - 0.24) / 0.28);
+          this.playLean = 0.34 + 0.30 * c;
+          this.playTwist = 0.30 + 0.42 * c;
+          this.playHeadPitch = -0.24 * c;
+          this.playHeadYaw = -0.20 + 0.34 * c;
+          this.playArmL = 0.20 * c;
+          this.playArmR = 0.20 * c;
+          this.playReach = 0.06 * c;
+          this.playSquash = -0.06 * c;
+          this.playTailWag = 0.35 + 0.55 * c;
+        } else if (k < 0.78) {
+          // 蹬腿：四爪朝天交替蹬动
+          const c = (k - 0.52) / 0.26;
+          const kick = Math.sin(c * Math.PI * 4);
+          this.playLean = 0.64;
+          this.playTwist = 0.72;
+          this.playHeadPitch = -0.24;
+          this.playHeadYaw = 0.14;
+          this.playArmL = 0.20 + 0.10 * Math.abs(kick);
+          this.playArmR = 0.20 + 0.10 * Math.abs(kick > 0 ? 0 : 1);
+          this.playReach = 0.06;
+          this.playSquash = -0.06;
+          this.playTailWag = 0.90 + 0.30 * Math.abs(kick);
+          this.playSquint = 0.30 * Math.max(0, kick);
+        } else {
+          // 翻回：身体慢慢转正，抖抖毛收尾
+          const c = easeOut((k - 0.78) / 0.22);
+          this.playLean = 0.64 * (1 - c);
+          this.playTwist = 0.72 * (1 - c);
+          this.playHeadPitch = -0.24 * (1 - c);
+          this.playHeadYaw = 0.14 * (1 - c);
+          this.playArmL = 0.20 * (1 - c);
+          this.playArmR = 0.20 * (1 - c);
+          this.playSquash = -0.06 * (1 - c);
+          this.playTailWag = 0.50 * (1 - c) + 0.15 * Math.sin(c * Math.PI * 3);
+        }
+        break;
+      }
+      case 'wave': {
+        // 挥爪打招呼：抬起右爪 → 左右摆三下 → 歪头眯眼 → 收爪
+        if (k < 0.20) {
+          const c = easeOut(k / 0.20);
+          this.playArmR = 0.34 * c;
+          this.playHeadYaw = 0.14 * c;
+          this.playLean = -0.04 * c;
+          this.playTailWag = 0.45 * c;
+        } else if (k < 0.62) {
+          const c = (k - 0.20) / 0.42;
+          const w = Math.sin(c * Math.PI * 3);       // 摆三下
+          this.playArmR = 0.34 + 0.03 * Math.abs(w);
+          this.playSwing = 0.07 * w;                  // 爪子左右挥动
+          this.playHeadYaw = 0.14 + 0.06 * w;
+          this.playHeadPitch = -0.06;
+          this.playLean = -0.04;
+          this.playSquint = 0.25;
+          this.playTailWag = 0.45 + 0.35 * Math.abs(w);
+        } else if (k < 0.80) {
+          const c = (k - 0.62) / 0.18;
+          this.playArmR = 0.34 * (1 - easeOut(c));
+          this.playSwing = 0.02 * Math.sin(c * Math.PI * 2) * (1 - c);
+          this.playHeadYaw = 0.14 * (1 - c);
+          this.playHeadPitch = -0.06 * (1 - c);
+          this.playSquint = 0.25 * (1 - c);
+          this.playTailWag = 0.45 * (1 - c);
+        } else {
+          const c = (k - 0.80) / 0.20;
+          this.playTailWag = 0.20 * (1 - c);
+          this.playHeadYaw = 0.04 * (1 - c);
+        }
+        break;
+      }
+      case 'dance': {
+        // 跳舞：跟着节奏左右摇摆身体 → 点头晃脑 → 尾巴打节拍 → 收势
+        const rise = Math.min(1, k / 0.12);
+        const fall = 1 - easeInOut(Math.max(0, (k - 0.86) / 0.14));
+        const env = rise * fall;
+        const beat = k * Math.PI * 8;                // 四个节拍
+        const sway = Math.sin(beat);
+        const bob = Math.abs(Math.sin(beat * 0.5));
+        this.playTwist = 0.34 * sway * env;
+        this.playLean = 0.16 * sway * env;
+        this.playHeadYaw = 0.24 * sway * env;
+        this.playHeadPitch = -0.10 * bob * env;
+        this.playSquash = 0.06 * bob * env;
+        this.playArmL = 0.14 * (0.6 + 0.4 * Math.sin(beat + Math.PI)) * env;
+        this.playArmR = 0.14 * (0.6 + 0.4 * Math.sin(beat)) * env;
+        this.playSwing = 0.05 * sway * env;
+        this.playTailWag = 0.65 + 0.45 * Math.abs(sway) * env;
+        this.playSquint = 0.15 * env;
+        break;
+      }
+      case 'laserChase': {
+        // 追激光笔：盯着光点 → 头部跟踪转向 → 突然扑击 → 扑空甩头 → 不甘再盯
+        const cx = this.cursorNdc.x;                  // -1..1 光标横向位置
+        if (k < 0.26) {
+          // 锁定目标：头随光点转
+          const c = easeOut(k / 0.26);
+          this.playHeadYaw = clamp(cx * 0.55, -0.55, 0.55) * c;
+          this.playHeadPitch = -0.10 * c;
+          this.playLean = 0.06 * c;
+          this.playTwist = clamp(cx * 0.30, -0.30, 0.30) * c;
+          this.playTailWag = 0.40 + 0.40 * c;        // 屁股尾巴兴奋甩动
+        } else if (k < 0.54) {
+          // 蓄力+扑击：压身 → 朝光点方向扑出
+          const c = (k - 0.26) / 0.28;
+          const pounce = easeOut(Math.min(1, c / 0.45));
+          this.playSquash = 0.14 * (1 - pounce);
+          this.playLean = 0.06 + 0.20 * pounce * Math.sign(cx || 1);
+          this.playHeadYaw = clamp(cx * 0.55, -0.55, 0.55) * (1 - pounce * 0.5);
+          this.playHeadPitch = -0.10 + 0.18 * pounce;
+          this.playArmL = 0.12 * pounce;
+          this.playArmR = 0.12 * pounce;
+          this.playReach = 0.10 * pounce;
+          this.playTailWag = 0.80 + 0.50 * pounce;
+        } else if (k < 0.76) {
+          // 扑空：落地 + 甩头（困惑）
+          const c = (k - 0.54) / 0.22;
+          const shake = Math.sin(c * Math.PI * 5) * (1 - c);
+          this.playHeadYaw = 0.30 * shake;
+          this.playHeadPitch = 0.10 * (1 - c);
+          this.playSquash = 0.10 * (1 - c);
+          this.playTailWag = 0.60 * (1 - c);
+          this.playSquint = 0.35 * (1 - c);
+        } else {
+          // 不甘心：重新盯住光点
+          const c = easeOut((k - 0.76) / 0.24);
+          this.playHeadYaw = clamp(cx * 0.55, -0.55, 0.55) * c;
+          this.playHeadPitch = -0.08 * c;
+          this.playTailWag = 0.30 + 0.35 * c;
         }
         break;
       }
@@ -2929,6 +3219,7 @@ export class KuroCatEngine3D {
     this.excite += (Math.min(1, cps / 7.5) - this.excite) * approach(7.5, dt);
 
     this.updateIdlePlay(t, dt);
+    this.updateWalk(t, dt);
     const baseSleep = this.embedded ? 18 : 28;
     const sleepAfterSec = this.playEnabled ? Math.max(baseSleep, this.playThreshold + 90) : baseSleep;
     const idleSec = t - this.lastInput;

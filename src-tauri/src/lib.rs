@@ -349,6 +349,7 @@ fn update_settings(app: AppHandle, state: State<'_, AppState>, mut patch: AppSet
     patch.key_sound_volume = patch.key_sound_volume.min(100);
     patch.key_sound_style = config::normalize_key_sound_style(&patch.key_sound_style);
     patch.key_sound_pack = config::normalize_key_sound_pack(&patch.key_sound_pack);
+    patch.walk_mode = config::normalize_walk_mode(&patch.walk_mode);
 
     let (prev_autostart, prev_scale, prev_layout, prev_obs_hide) = {
         let s = state.settings.lock().unwrap();
@@ -924,6 +925,130 @@ async fn start_pet_drag(app: AppHandle) -> bool {
         let _ = app;
         false
     }
+}
+
+/// 程序化移动桌宠窗口（供"自由走动"使用）。
+/// dx/dy 为物理像素增量；复用拖拽的边界钳制逻辑，避免猫走出屏幕。
+/// 拖拽进行中 / 菜单打开时拒绝移动，避免与用户操作打架。
+/// 返回 Some((实际x, 实际y)) 表示成功移动，None 表示跳过。
+#[tauri::command]
+fn move_pet_by(app: AppHandle, state: State<'_, AppState>, dx: i32, dy: i32) -> Option<(i32, i32)> {
+    if dx == 0 && dy == 0 {
+        return None;
+    }
+    // 与用户拖拽 / 菜单操作互斥
+    if state.dragging.load(Ordering::Relaxed) || state.menu_open.load(Ordering::Relaxed) {
+        return None;
+    }
+
+    let win = app.get_webview_window("main")?;
+
+    #[cfg(windows)]
+    let is_win7 = win_needs_win7_ulw();
+
+    // 当前位置与尺寸（物理像素）
+    #[cfg(windows)]
+    let (cur_x, cur_y, win_w, win_h) = if is_win7 {
+        match win7_layered::get_rect() {
+            Some((x, y, w, h)) => (x, y, w as i32, h as i32),
+            None => return None,
+        }
+    } else {
+        match (win.outer_position().ok(), win.outer_size().ok()) {
+            (Some(p), Some(sz)) => (p.x, p.y, sz.width as i32, sz.height as i32),
+            _ => return None,
+        }
+    };
+    #[cfg(not(windows))]
+    let (cur_x, cur_y, win_w, win_h) = match (win.outer_position().ok(), win.outer_size().ok()) {
+        (Some(p), Some(sz)) => (p.x, p.y, sz.width as i32, sz.height as i32),
+        _ => return None,
+    };
+
+    // 虚拟桌面边界（多显示器）
+    #[cfg(windows)]
+    let (v_left, v_top, v_w, v_h) = {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
+            SM_YVIRTUALSCREEN,
+        };
+        unsafe {
+            (
+                GetSystemMetrics(SM_XVIRTUALSCREEN),
+                GetSystemMetrics(SM_YVIRTUALSCREEN),
+                GetSystemMetrics(SM_CXVIRTUALSCREEN),
+                GetSystemMetrics(SM_CYVIRTUALSCREEN),
+            )
+        }
+    };
+    #[cfg(not(windows))]
+    let (v_left, v_top, v_w, v_h) = (0, 0, 1920, 1080);
+
+    let (nx, ny) = clamp_pet_drag_position(
+        cur_x + dx,
+        cur_y + dy,
+        win_w,
+        win_h,
+        v_left,
+        v_top,
+        v_w,
+        v_h,
+    );
+    if nx == cur_x && ny == cur_y {
+        return None; // 已到边界，前端可据此转身
+    }
+
+    #[cfg(windows)]
+    {
+        if is_win7 {
+            win7_layered::set_position(nx, ny);
+            if win7_layered::is_overlay_active() {
+                match win.hwnd() {
+                    Ok(hwnd) => unsafe {
+                        use windows_sys::Win32::UI::WindowsAndMessaging::{
+                            SetWindowPos, SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER,
+                        };
+                        SetWindowPos(
+                            hwnd.0 as windows_sys::Win32::Foundation::HWND,
+                            std::ptr::null_mut(),
+                            nx,
+                            ny,
+                            0,
+                            0,
+                            SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+                        );
+                    },
+                    Err(_) => {}
+                }
+            }
+        } else {
+            match win.hwnd() {
+                Ok(hwnd) => unsafe {
+                    use windows_sys::Win32::UI::WindowsAndMessaging::{
+                        SetWindowPos, SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER,
+                    };
+                    SetWindowPos(
+                        hwnd.0 as windows_sys::Win32::Foundation::HWND,
+                        std::ptr::null_mut(),
+                        nx,
+                        ny,
+                        0,
+                        0,
+                        SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+                    );
+                },
+                Err(_) => {
+                    let _ = win.set_position(PhysicalPosition::new(nx, ny));
+                }
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = win.set_position(PhysicalPosition::new(nx, ny));
+    }
+
+    Some((nx, ny))
 }
 
 #[tauri::command]
@@ -2795,6 +2920,7 @@ pub fn run() {
             save_tail_picker_selection,
             set_dragging,
             start_pet_drag,
+            move_pet_by,
             set_update_banner_open,
             is_win7_ulw_mode,
             win7_present_frame,
