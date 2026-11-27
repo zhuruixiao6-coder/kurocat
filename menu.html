@@ -119,11 +119,23 @@
               <span>亮</span>
             </div>
           </div>
-          <button class="menu-item" data-action="pick-light-color" title="打开色盘选择键盘灯光颜色（选中后自动切到纯色模式）">
-            <span>灯光颜色</span>
-            <span class="menu-check" id="kb-color-swatch">● #22e0e6</span>
-          </button>
-          <input type="color" id="kb-color-input" value="#22e0e6" style="position:absolute; width:0; height:0; opacity:0; pointer-events:none;" />
+          <div class="kb-swatch-wrap">
+            <div class="kb-swatch-title">灯光颜色 <span id="kb-color-swatch">#22e0e6</span></div>
+            <div class="kb-swatches" id="kb-swatches">
+              <button type="button" class="kb-swatch" data-kbcolor="#22e0e6" style="background:#22e0e6" title="#22e0e6"></button>
+              <button type="button" class="kb-swatch" data-kbcolor="#3b82f6" style="background:#3b82f6" title="#3b82f6"></button>
+              <button type="button" class="kb-swatch" data-kbcolor="#a855f7" style="background:#a855f7" title="#a855f7"></button>
+              <button type="button" class="kb-swatch" data-kbcolor="#e14ec4" style="background:#e14ec4" title="#e14ec4"></button>
+              <button type="button" class="kb-swatch" data-kbcolor="#ef4444" style="background:#ef4444" title="#ef4444"></button>
+              <button type="button" class="kb-swatch" data-kbcolor="#f59e0b" style="background:#f59e0b" title="#f59e0b"></button>
+              <button type="button" class="kb-swatch" data-kbcolor="#22c55e" style="background:#22c55e" title="#22c55e"></button>
+              <button type="button" class="kb-swatch" data-kbcolor="#14b8a6" style="background:#14b8a6" title="#14b8a6"></button>
+              <button type="button" class="kb-swatch" data-kbcolor="#ffffff" style="background:#ffffff" title="#ffffff"></button>
+              <button type="button" class="kb-swatch" data-kbcolor="#94a3b8" style="background:#94a3b8" title="#94a3b8"></button>
+              <button type="button" class="kb-swatch" data-kbcolor="#f472b6" style="background:#f472b6" title="#f472b6"></button>
+              <button type="button" class="kb-swatch" data-kbcolor="#facc15" style="background:#facc15" title="#facc15"></button>
+            </div>
+          </div>
           <button class="menu-item" data-action="open-skin-folder" title="打开 %APPDATA%\kuro-cat-pet\skins，把自定义皮肤贴图放进去">
             <span>猫猫皮肤文件夹</span>
             <span class="menu-check">📂</span>

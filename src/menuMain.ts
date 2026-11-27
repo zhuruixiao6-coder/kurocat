@@ -139,6 +139,10 @@ const breedPillsEl = document.getElementById('breed-pills') as HTMLDivElement;
 const scaleSliderEl = document.getElementById('scale-slider') as HTMLInputElement;
 const kbRgbSliderEl = document.getElementById('kb-rgb-slider') as HTMLInputElement | null;
 const kbColorInputEl = document.getElementById('kb-color-input') as HTMLInputElement | null;
+/** 只接受 #rrggbb，其它一律回落默认，避免出现 #ffff 这类残值 */
+function normHex(v: unknown, fallback: string): string {
+  return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v.trim()) ? v.trim().toLowerCase() : fallback;
+}
 const scaleValueEl = document.getElementById('scale-value') as HTMLButtonElement;
 const tailModeBadgeEl = document.getElementById('tail-mode-badge') as HTMLSpanElement;
 const tailKeysCountEl = document.getElementById('tail-keys-count') as HTMLSpanElement;
@@ -998,9 +1002,9 @@ function syncUI(): void {
       const mode = settings.kbColorMode ?? 0;
       const cm = document.getElementById('kb-color-mode');
       if (cm) cm.textContent = paletteNames[mode] ?? '彩虹';
-      const ca = settings.kbColorA ?? '#22e0e6';
-      const cb2 = settings.kbColorB ?? '#2b6cf0';
-      const cc = settings.kbColorC ?? '#e14ec4';
+        const ca = normHex(settings.kbColorA, '#22e0e6');
+      const cb2 = normHex(settings.kbColorB, '#2b6cf0');
+      const cc = normHex(settings.kbColorC, '#e14ec4');
       const ea = document.getElementById('kb-color-a');
       if (ea) { ea.textContent = `● ${ca}`; ea.style.color = ca; }
       const eb = document.getElementById('kb-color-b');
@@ -1008,8 +1012,11 @@ function syncUI(): void {
       const ec = document.getElementById('kb-color-c');
       if (ec) { ec.textContent = `● ${cc}`; ec.style.color = cc; }
       const sw = document.getElementById('kb-color-swatch');
-      if (sw) { sw.textContent = `● ${ca}`; sw.style.color = ca; }
-      if (kbColorInputEl && kbColorInputEl.value.toLowerCase() !== ca.toLowerCase()) kbColorInputEl.value = ca;
+      if (sw) sw.textContent = ca;
+      document.querySelectorAll<HTMLElement>('.kb-swatch').forEach((el) => {
+        const isSel = (el.dataset.kbcolor ?? '').toLowerCase() === ca;
+        el.classList.toggle('is-selected', isSel);
+      });
       const pv = document.getElementById('kb-color-preview');
       if (pv) {
         pv.style.background = mode === 1
@@ -1026,23 +1033,28 @@ function syncUI(): void {
     const mEl = document.getElementById('kb-rgb-mode');
     if (mEl) mEl.textContent = `${rgbMode > 0 ? '✓' : '○'} ${modeNames[rgbMode] ?? '渐变'}`;
     const brightPct = Math.round((settings.kbRgbBright ?? 1) * 100);
-    if (kbColorInputEl) {
-    let colorTimer: number | undefined;
-    const applyColor = () => {
-      const v = kbColorInputEl.value;
-      const sw = document.getElementById('kb-color-swatch');
-      if (sw) { sw.textContent = `● ${v}`; sw.style.color = v; }
-      const pv = document.getElementById('kb-color-preview');
-      if (pv) pv.style.background = `linear-gradient(90deg, ${v}, ${v})`;
-      const hint = document.getElementById('kb-color-hint');
-      if (hint) hint.textContent = `纯色 ${v}`;
-      if (colorTimer) window.clearTimeout(colorTimer);
-      colorTimer = window.setTimeout(() => {
-        void applySettingsPatch({ kbColorA: v, kbColorMode: 1 });
-      }, 60);
-    };
-    kbColorInputEl.addEventListener('input', applyColor);
-    kbColorInputEl.addEventListener('change', applyColor);
+    {
+    const grid = document.getElementById('kb-swatches');
+    if (grid) {
+      grid.addEventListener('click', (e) => {
+        const chip = (e.target as HTMLElement).closest<HTMLElement>('.kb-swatch');
+        if (!chip) return;
+        const hex = normHex(chip.dataset.kbcolor, '#22e0e6');
+        // 先立刻改 UI（高亮 + 预览 + 文本），再落设置，避免等待回包造成不同步
+        document.querySelectorAll<HTMLElement>('.kb-swatch').forEach((el) => {
+          el.classList.toggle('is-selected', el === chip);
+        });
+        const sw = document.getElementById('kb-color-swatch');
+        if (sw) sw.textContent = hex;
+        const pv = document.getElementById('kb-color-preview');
+        if (pv) pv.style.background = `linear-gradient(90deg, ${hex}, ${hex})`;
+        const hint = document.getElementById('kb-color-hint');
+        if (hint) hint.textContent = `纯色 ${hex}`;
+        const modeEl = document.getElementById('kb-color-mode');
+        if (modeEl) modeEl.textContent = '纯色';
+        void applySettingsPatch({ kbColorA: hex, kbColorMode: 1 });
+      });
+    }
   }
 
   if (kbRgbSliderEl) {
@@ -1564,12 +1576,6 @@ async function bootstrap(): Promise<void> {
         break;
       case 'toggle-bubbles':
         void applySettingsPatch({ showKeyBubbles: !settings.showKeyBubbles });
-        break;
-      case 'pick-light-color':
-        if (kbColorInputEl) {
-          kbColorInputEl.value = settings.kbColorA ?? '#22e0e6';
-          kbColorInputEl.click();
-        }
         break;
       case 'cycle-kb-color-mode':
         void applySettingsPatch({ kbColorMode: ((settings.kbColorMode ?? 0) + 1) % 3 });

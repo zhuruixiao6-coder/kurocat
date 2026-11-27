@@ -435,9 +435,9 @@ function syncEngine3DState(): void {
   const rgbBright = settings.kbRgbBright ?? 1;
   const rgbSpeed = settings.kbRgbSpeed ?? 1;
   engine3d.setKeyboardPalette(settings.kbColorMode ?? 0, [
-    settings.kbColorA ?? '#22e0e6',
-    settings.kbColorB ?? '#2b6cf0',
-    settings.kbColorC ?? '#e14ec4',
+    kbHex(settings.kbColorA, '#22e0e6'),
+    kbHex(settings.kbColorB, '#2b6cf0'),
+    kbHex(settings.kbColorC, '#e14ec4'),
   ]);
   engine3d.setKeyboardLightsOff(settings.kbLightsOff !== false);
   engine3d.setKeyboardRgb(
@@ -905,6 +905,10 @@ async function confirmTailPicker(): Promise<void> {
   syncMenuUI();
 }
 
+function kbHex(v: unknown, fallback: string): string {
+  return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v.trim()) ? v.trim().toLowerCase() : fallback;
+}
+
 async function applySettingsPatch(patch: Partial<AppSettings>): Promise<void> {
   settings = { ...settings, ...patch };
   syncMenuUI();
@@ -1276,9 +1280,9 @@ async function bootstrap(): Promise<void> {
       const br = settings.kbRgbBright ?? 1;
       const sp = settings.kbRgbSpeed ?? 1;
       engine3d?.setKeyboardPalette(settings.kbColorMode ?? 0, [
-        settings.kbColorA ?? '#22e0e6',
-        settings.kbColorB ?? '#2b6cf0',
-        settings.kbColorC ?? '#e14ec4',
+        kbHex(settings.kbColorA, '#22e0e6'),
+        kbHex(settings.kbColorB, '#2b6cf0'),
+        kbHex(settings.kbColorC, '#e14ec4'),
       ]);
       engine3d?.setKeyboardLightsOff(settings.kbLightsOff !== false);
       engine3d?.setKeyboardRgb(

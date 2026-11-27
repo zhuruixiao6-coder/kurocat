@@ -1602,3 +1602,30 @@ html.win7-ulw-mode .fish-bubble::after {
 }
 .perm-btn:hover { background: rgba(255, 255, 255, 0.16); }
 .perm-btn.primary { border-color: rgba(200, 245, 56, 0.5); color: #d6ff6a; }
+
+/* 离散色块选择器（参考图像软件的单色色板） */
+.kb-swatch-wrap { padding: 6px 10px 10px; }
+.kb-swatch-title {
+  font-size: 12px; opacity: .85; margin-bottom: 6px;
+  display: flex; justify-content: space-between; align-items: baseline;
+}
+.kb-swatch-title span { font-weight: 700; color: #c8f538; }
+.kb-swatches {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px;
+}
+.kb-swatch {
+  width: 100%; aspect-ratio: 1 / 1; border-radius: 6px;
+  border: 2px solid rgba(255,255,255,.18);
+  cursor: pointer; padding: 0; position: relative;
+  transition: transform .08s ease, box-shadow .12s ease, border-color .12s ease;
+}
+.kb-swatch:hover { transform: scale(1.06); }
+.kb-swatch.is-selected {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(200,245,56,.85), 0 0 8px rgba(200,245,56,.45);
+}
+.kb-swatch.is-selected::after {
+  content: "✓"; position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #101010; font-weight: 900; font-size: 13px; text-shadow: 0 0 4px rgba(255,255,255,.9);
+}
