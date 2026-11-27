@@ -698,6 +698,17 @@ export class KuroCatEngine3D {
   private tailKeyMode: TailKeyMode = 'smart';
   private tailKeyIdSet = new Set<string>(DEFAULT_TAIL_KEY_IDS);
   private bend = { x: 0, z: 0, squash: 0, bellySwell: 0 };
+  // 骨骼层级（仅变换，不含几何）：hips→spine→chest→neck→head，chest→arm，hips→tail
+  private readonly rig = {
+    hips: new THREE.Object3D(),
+    spine: new THREE.Object3D(),
+    chest: new THREE.Object3D(),
+    neck: new THREE.Object3D(),
+    head: new THREE.Object3D(),
+    tail: new THREE.Object3D(),
+    armL: new THREE.Object3D(),
+    armR: new THREE.Object3D(),
+  };
   private headRot = { pitch: -0.04, yaw: 0, roll: 0 };
 
   private paws: { L: PawTrack3D; R: PawTrack3D };
@@ -829,6 +840,20 @@ export class KuroCatEngine3D {
 
     // 1) Original KuroCat Continuous One-Piece Mochi-Pear Silhouette (exact BODY_SLICES proportions!)
     this.catRoot.position.copy(this.homePos);
+    // —— 骨骼链（rest 位姿；原点即关节位置）——
+    this.rig.hips.position.set(0, 0.55, 0);
+    this.rig.spine.position.set(0, 0.42, 0);
+    this.rig.chest.position.set(0, 0.28, 0);
+    this.rig.neck.position.set(0, 0.20, 0);
+    this.rig.head.position.set(0, 0.11, 0);
+    this.rig.tail.position.set(0, -0.05, -0.34);
+    this.rig.armL.position.set(-0.34, 0.05, 0.10);
+    this.rig.armR.position.set(0.34, 0.05, 0.10);
+    this.catRoot.add(this.rig.hips);
+    this.rig.hips.add(this.rig.spine, this.rig.tail);
+    this.rig.spine.add(this.rig.chest);
+    this.rig.chest.add(this.rig.neck, this.rig.armL, this.rig.armR);
+    this.rig.neck.add(this.rig.head);
     this.catRoot.scale.setScalar(0.90);
     this.scene.add(this.catRoot);
 
@@ -1463,10 +1488,26 @@ export class KuroCatEngine3D {
       this.bend.z,
       this.bend.squash,
       this.bend.bellySwell,
-      this.headRot.pitch,
-      this.headRot.yaw,
+      this.headRot.pitch + this.rig.head.rotation.x,
+      this.headRot.yaw + this.rig.head.rotation.y,
       this.headRot.roll,
+      this.rig.spine.rotation.y + this.rig.chest.rotation.y,
     );
+  }
+
+  /** 每帧：把动作参数写进骨骼（只写用到的关节，其余保持 rest） */
+  private applyRig(): void {
+    const on = this.playActive;
+    this.rig.spine.rotation.y = on ? this.playTwist * 0.45 : 0;
+    this.rig.chest.rotation.y = on ? this.playTwist * 0.55 : 0;
+    this.rig.spine.rotation.z = on ? this.playLean * 0.25 : 0;
+    this.rig.chest.rotation.z = on ? this.playLean * 0.35 : 0;
+    this.rig.hips.rotation.z = on ? this.playLean * 0.15 : 0;
+    this.rig.head.rotation.x = on ? this.playHeadPitch : 0;
+    this.rig.head.rotation.y = on ? this.playHeadYaw : 0;
+    this.rig.tail.rotation.y = on ? Math.sin(this.playTwist * 3.0) * 0.12 : 0;
+    this.rig.armL.rotation.x = on ? -this.playArmL * 1.6 : 0;
+    this.rig.armR.rotation.x = on ? -this.playArmR * 1.6 : 0;
   }
 
   private placeHeadAndCollar(): void {
@@ -2838,8 +2879,6 @@ export class KuroCatEngine3D {
       targetGazeY = -0.52;
     }
 
-    targetYaw += this.playHeadYaw;
-    targetPitch += this.playHeadPitch;
 
     if (act) {
       if (act.kind === 'tilt') targetRoll += act.side * 0.19 * actEnv;
@@ -2861,6 +2900,7 @@ export class KuroCatEngine3D {
     this.headRot.roll = this.sRoll.step(targetRoll, dt) + wakeShake;
 
     // Deform one-piece body+head smoothly & sync headMount + optional collar!
+    this.applyRig();
     this.deformCatBody();
     this.placeHeadAndCollar();
 

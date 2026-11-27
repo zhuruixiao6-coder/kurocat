@@ -412,6 +412,7 @@ export class FurShaderSystem {
       // GPU body+head deformation uniforms (eliminates 4,745-vert CPU deformation + computeVertexNormals + PCIe upload every frame!)
       uBend: { value: new THREE.Vector4(0, 0, 0, 0) }, // (x, z, squash, bellySwell)
       uHeadRot: { value: new THREE.Vector3(-0.04, 0, 0) }, // (pitch, yaw, roll) Euler YXZ
+      uTwist: { value: 0 },
       uCoatMap: { value: null as THREE.Texture | null },
       uCoatAmt: { value: 0 },
     };
@@ -425,9 +426,11 @@ export class FurShaderSystem {
     pitch: number,
     yaw: number,
     roll: number,
+    twist = 0,
   ): void {
     (this.uniforms.uBend.value as THREE.Vector4).set(bx, bz, squash, bellySwell);
     (this.uniforms.uHeadRot.value as THREE.Vector3).set(pitch, yaw, roll);
+    this.uniforms.uTwist.value = twist;
   }
 
   public createMaterial(part: FurPart, side = 0): THREE.ShaderMaterial {
@@ -440,6 +443,7 @@ export class FurShaderSystem {
       #ifdef CAT_BODY
         uniform vec4 uBend;
         uniform vec3 uHeadRot;
+        uniform float uTwist; // 躯干骨骼扭转（弧度），按高度权重只作用于腰腹段
       #endif
       varying vec3 vRest;
       varying vec3 vNormal;
@@ -481,6 +485,22 @@ export class FurShaderSystem {
           float swell = 1.0 + uBend.w * smoothstep(1.30, 0.65, y0) * smoothstep(0.0, 0.25, y0);
 
           vec3 pDef = vec3(x0 * swell, y0, z0 * swell);
+
+          // 骨骼扭转：只作用在腰腹段（髋部与头部权重为 0），实现"胸腔相对骨盆转动"
+          if (abs(uTwist) > 0.0005) {
+            float tw = smoothstep(0.30, 0.70, y0) * (1.0 - smoothstep(1.24, 1.55, y0));
+            float ang = uTwist * tw;
+            float ca = cos(ang);
+            float sa = sin(ang);
+            float px = pDef.x;
+            float pz = pDef.z;
+            pDef.x = ca * px + sa * pz;
+            pDef.z = -sa * px + ca * pz;
+            float nx = localNrm.x;
+            float nz = localNrm.z;
+            localNrm.x = ca * nx + sa * nz;
+            localNrm.z = -sa * nx + ca * nz;
+          }
 
           if (headW > 0.001) {
             float ax = uHeadRot.x * headW;
