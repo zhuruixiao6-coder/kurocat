@@ -79,6 +79,30 @@
             <span>自由走动</span>
             <span class="menu-check" id="val-walk-mode">关闭</span>
           </button>
+          <button class="menu-item" data-action="cycle-kb-color-mode" title="灯效配色：彩虹（默认）/ 纯色 / 混色">
+            <span>灯效配色</span>
+            <span class="menu-check" id="kb-color-mode">彩虹</span>
+          </button>
+          <button class="menu-item" data-action="cycle-kb-color-a" title="纯色模式使用颜色 1；混色模式为左段颜色">
+            <span>颜色 1</span>
+            <span class="menu-check" id="kb-color-a">● #22e0e6</span>
+          </button>
+          <button class="menu-item" data-action="cycle-kb-color-b" title="混色模式的中段颜色">
+            <span>颜色 2</span>
+            <span class="menu-check" id="kb-color-b">● #2b6cf0</span>
+          </button>
+          <button class="menu-item" data-action="cycle-kb-color-c" title="混色模式的右段颜色">
+            <span>颜色 3</span>
+            <span class="menu-check" id="kb-color-c">● #e14ec4</span>
+          </button>
+          <div class="scale-slider-wrap" style="padding: 4px 12px 8px;">
+            <div id="kb-color-preview" style="height: 14px; border-radius: 7px; border: 1px solid rgba(255,255,255,.18); background: linear-gradient(90deg,#22e0e6,#2b6cf0,#e14ec4);"></div>
+            <div class="scale-ticks"><span>配色预览</span><span class="scale-tick-mid" id="kb-color-hint">彩虹（默认）</span><span></span></div>
+          </div>
+          <button class="menu-item" data-action="reset-kb-colors" title="恢复默认：彩虹配色、渐变模式、亮度 115%">
+            <span>恢复默认灯效</span>
+            <span class="menu-check">↺</span>
+          </button>
           <button class="menu-item" data-action="toggle-kb-lights" title="键盘总灯光：关闭后 RGB 灯层与按键光效全部熄灭">
             <span>键盘灯光</span>
             <span class="menu-check" id="kb-lights">✓</span>

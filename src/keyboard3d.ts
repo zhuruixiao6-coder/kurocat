@@ -548,6 +548,8 @@ export class KeyboardAndMouse3D {
   private rgbTime = 0;
   private rgbState = { mode: 1, color: '#22e0e6', bright: 0.85, speed: 1 };
   private lightsOff = false;
+  private paletteMode = 0;
+  private paletteColors: [string, string, string] = ['#22e0e6', '#2b6cf0', '#e14ec4'];
   public readonly mouseGroup = new THREE.Group();
   public readonly deskGroup = new THREE.Group();
 
@@ -901,6 +903,8 @@ export class KeyboardAndMouse3D {
         uMode: { value: this.rgbState.mode },
         uColA: { value: new THREE.Color(this.rgbState.color) },
         uColB: { value: new THREE.Color('#2b6cf0') },
+        uColC: { value: new THREE.Color('#e14ec4') },
+        uColorMode: { value: 0 },
       },
       transparent: true,
       depthWrite: false,
@@ -914,7 +918,8 @@ export class KeyboardAndMouse3D {
       `,
       fragmentShader: `
         uniform float uTime; uniform float uBright; uniform float uMode;
-        uniform vec3 uColA; uniform vec3 uColB;
+        uniform vec3 uColA; uniform vec3 uColB; uniform vec3 uColC;
+        uniform float uColorMode; // 0=彩虹 1=纯色 2=混色
         varying vec2 vUv;
 
         // HSV → RGB，用来做整片彩虹，而不是两色渐变
@@ -948,6 +953,16 @@ export class KeyboardAndMouse3D {
             col = hsv2rgb(vec3(hue, 0.95, 1.0));
             g = 0.14 + 0.86 * sweep;
           }
+          // —— 配色模式：0 彩虹（默认） / 1 纯色 / 2 三色混合 ——
+          if (uColorMode > 1.5) {
+            float t = clamp(vUv.x, 0.0, 1.0);
+            col = t < 0.5
+              ? mix(uColA, uColB, smoothstep(0.0, 0.5, t))
+              : mix(uColB, uColC, smoothstep(0.5, 1.0, t));
+          } else if (uColorMode > 0.5) {
+            col = uColA;
+          }
+
           // 亮度归一但保留对比：0.55~1.12，浅色键帽上也能看清光带层次
           g = 0.55 + 0.57 * clamp(g, 0.0, 1.0);
           // 边缘柔化：靠外侧渐弱，形成自然光晕而不是硬边
@@ -1213,6 +1228,18 @@ export class KeyboardAndMouse3D {
     this.mouseGroup.updateMatrixWorld(false);
     this.mouseShape.updateMatrixWorld(false);
     return out.set(0, 0.115, -0.05).applyMatrix4(this.mouseShape.matrixWorld);
+  }
+
+  /** 配色：0 彩虹 / 1 纯色 / 2 混色（三色） */
+  public setPaletteMode(mode: number, colors: [string, string, string]): void {
+    const mat = this.rgbPlane?.material as THREE.ShaderMaterial | undefined;
+    this.paletteMode = mode;
+    this.paletteColors = colors;
+    if (!mat) return;
+    mat.uniforms.uColorMode.value = mode;
+    (mat.uniforms.uColA.value as THREE.Color).set(colors[0]);
+    (mat.uniforms.uColB.value as THREE.Color).set(colors[1]);
+    (mat.uniforms.uColC.value as THREE.Color).set(colors[2]);
   }
 
   /** 键盘总灯光开关：true = 全部熄灭（RGB 灯层 + 按键按下的发光） */

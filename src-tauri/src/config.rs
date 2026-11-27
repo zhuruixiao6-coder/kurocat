@@ -23,6 +23,10 @@ fn default_kb_rgb_color() -> String { "#22e0e6".to_string() }
 fn default_kb_rgb_bright() -> f32 { 1.15 }
 fn default_kb_rgb_speed() -> f32 { 1.0 }
 fn default_kb_lights_off() -> bool { false }
+fn default_kb_color_mode() -> u8 { 0 }
+fn default_kb_color_a() -> String { "#22e0e6".to_string() }
+fn default_kb_color_b() -> String { "#2b6cf0".to_string() }
+fn default_kb_color_c() -> String { "#e14ec4".to_string() }
 
 fn default_mcp_enabled() -> bool {
     true
@@ -243,6 +247,14 @@ pub struct AppSettings {
     pub kb_rgb_speed: f32,
     #[serde(default = "default_kb_lights_off")]
     pub kb_lights_off: bool,
+    #[serde(default = "default_kb_color_mode")]
+    pub kb_color_mode: u8,
+    #[serde(default = "default_kb_color_a")]
+    pub kb_color_a: String,
+    #[serde(default = "default_kb_color_b")]
+    pub kb_color_b: String,
+    #[serde(default = "default_kb_color_c")]
+    pub kb_color_c: String,
     #[serde(default = "default_privacy_password_guard")]
     pub privacy_password_guard: bool,
     #[serde(default = "default_tail_key_mode")]
@@ -296,6 +308,10 @@ impl Default for AppSettings {
             kb_rgb_bright: default_kb_rgb_bright(),
             kb_rgb_speed: default_kb_rgb_speed(),
             kb_lights_off: default_kb_lights_off(),
+            kb_color_mode: default_kb_color_mode(),
+            kb_color_a: default_kb_color_a(),
+            kb_color_b: default_kb_color_b(),
+            kb_color_c: default_kb_color_c(),
             privacy_password_guard: default_privacy_password_guard(),
             tail_key_mode: default_tail_key_mode(),
             tail_key_ids: default_tail_key_ids(),

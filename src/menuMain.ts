@@ -38,6 +38,10 @@ interface AppSettings {
   kbRgbBright?: number;
   kbRgbSpeed?: number;
   kbLightsOff?: boolean;
+  kbColorMode?: number;
+  kbColorA?: string;
+  kbColorB?: string;
+  kbColorC?: string;
   keyboardOrientation: KeyboardOrientation;
   privacyPasswordGuard: boolean;
   tailKeyMode: TailKeyMode;
@@ -106,6 +110,10 @@ let settings: AppSettings = {
   kbRgbBright: 1.15,
   kbRgbSpeed: 1,
   kbLightsOff: false,
+  kbColorMode: 0,
+  kbColorA: '#22e0e6',
+  kbColorB: '#2b6cf0',
+  kbColorC: '#e14ec4',
   keyboardOrientation: 'cat',
   privacyPasswordGuard: true,
   tailKeyMode: 'smart',
@@ -984,6 +992,29 @@ function syncUI(): void {
   setCheck('chk-bubbles', settings.showKeyBubbles);
   setCheck('chk-idle-play', settings.idlePlay !== false);
   {
+    {
+      const paletteNames = ['彩虹', '纯色', '混色'];
+      const mode = settings.kbColorMode ?? 0;
+      const cm = document.getElementById('kb-color-mode');
+      if (cm) cm.textContent = paletteNames[mode] ?? '彩虹';
+      const ca = settings.kbColorA ?? '#22e0e6';
+      const cb2 = settings.kbColorB ?? '#2b6cf0';
+      const cc = settings.kbColorC ?? '#e14ec4';
+      const ea = document.getElementById('kb-color-a');
+      if (ea) { ea.textContent = `● ${ca}`; ea.style.color = ca; }
+      const eb = document.getElementById('kb-color-b');
+      if (eb) { eb.textContent = `● ${cb2}`; eb.style.color = cb2; }
+      const ec = document.getElementById('kb-color-c');
+      if (ec) { ec.textContent = `● ${cc}`; ec.style.color = cc; }
+      const pv = document.getElementById('kb-color-preview');
+      if (pv) {
+        pv.style.background = mode === 1
+          ? `linear-gradient(90deg, ${ca}, ${ca})`
+          : `linear-gradient(90deg, ${ca}, ${cb2}, ${cc})`;
+      }
+      const hint = document.getElementById('kb-color-hint');
+      if (hint) hint.textContent = mode === 0 ? '彩虹（默认）' : mode === 1 ? `纯色 ${ca}` : '三色混合';
+    }
     const lightsEl = document.getElementById('kb-lights');
     if (lightsEl) lightsEl.textContent = settings.kbLightsOff === false ? '✓' : '○';
     const modeNames = ['关闭', '渐变', '呼吸', '流光'];
@@ -1510,6 +1541,32 @@ async function bootstrap(): Promise<void> {
         break;
       case 'toggle-bubbles':
         void applySettingsPatch({ showKeyBubbles: !settings.showKeyBubbles });
+        break;
+      case 'cycle-kb-color-mode':
+        void applySettingsPatch({ kbColorMode: ((settings.kbColorMode ?? 0) + 1) % 3 });
+        break;
+      case 'cycle-kb-color-a':
+      case 'cycle-kb-color-b':
+      case 'cycle-kb-color-c': {
+        const PALETTE = ['#22e0e6', '#3b82f6', '#a855f7', '#e14ec4', '#f59e0b', '#22c55e', '#ef4444', '#ffffff'];
+        const act = target.dataset.action;
+        const key = act === 'cycle-kb-color-a' ? 'kbColorA' : act === 'cycle-kb-color-b' ? 'kbColorB' : 'kbColorC';
+        const cur = (settings as any)[key] ?? PALETTE[0];
+        const idx = Math.max(0, PALETTE.indexOf(String(cur).toLowerCase()));
+        const next = PALETTE[(idx + 1) % PALETTE.length];
+        void applySettingsPatch({ [key]: next } as Partial<AppSettings>);
+        break;
+      }
+      case 'reset-kb-colors':
+        void applySettingsPatch({
+          kbColorMode: 0,
+          kbColorA: '#22e0e6',
+          kbColorB: '#2b6cf0',
+          kbColorC: '#e14ec4',
+          kbRgbMode: 1,
+          kbRgbBright: 1.15,
+          kbLightsOff: false,
+        });
         break;
       case 'toggle-kb-lights':
         void applySettingsPatch({ kbLightsOff: settings.kbLightsOff === false });

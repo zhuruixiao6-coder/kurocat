@@ -1914,6 +1914,10 @@ export class KuroCatEngine3D {
     this.desk.setRgb({ mode, color, bright, speed });
   }
 
+  public setKeyboardPalette(mode: number, colors: [string, string, string]): void {
+    this.desk.setPaletteMode(mode, colors);
+  }
+
   public setKeyboardLightsOff(off: boolean): void {
     this.desk.setLightsOff(off);
   }

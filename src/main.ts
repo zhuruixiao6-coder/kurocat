@@ -56,6 +56,10 @@ interface AppSettings {
   kbRgbBright?: number;
   kbRgbSpeed?: number;
   kbLightsOff?: boolean;
+  kbColorMode?: number;
+  kbColorA?: string;
+  kbColorB?: string;
+  kbColorC?: string;
   keyboardOrientation: KeyboardOrientation;
   privacyPasswordGuard: boolean;
   tailKeyMode: TailKeyMode;
@@ -176,6 +180,10 @@ let settings: AppSettings = {
   kbRgbBright: 1.15,
   kbRgbSpeed: 1,
   kbLightsOff: false,
+  kbColorMode: 0,
+  kbColorA: '#22e0e6',
+  kbColorB: '#2b6cf0',
+  kbColorC: '#e14ec4',
   keyboardOrientation: 'cat',
   privacyPasswordGuard: true,
   tailKeyMode: 'smart',
@@ -426,6 +434,11 @@ function syncEngine3DState(): void {
   engine3d.setWalkMode(settings.walkMode ?? 'off');
   const rgbBright = settings.kbRgbBright ?? 1;
   const rgbSpeed = settings.kbRgbSpeed ?? 1;
+  engine3d.setKeyboardPalette(settings.kbColorMode ?? 0, [
+    settings.kbColorA ?? '#22e0e6',
+    settings.kbColorB ?? '#2b6cf0',
+    settings.kbColorC ?? '#e14ec4',
+  ]);
   engine3d.setKeyboardLightsOff(settings.kbLightsOff !== false);
   engine3d.setKeyboardRgb(
     settings.kbRgbMode ?? 1,
@@ -1262,6 +1275,11 @@ async function bootstrap(): Promise<void> {
       engine3d?.setWalkMode(settings.walkMode ?? 'off');
       const br = settings.kbRgbBright ?? 1;
       const sp = settings.kbRgbSpeed ?? 1;
+      engine3d?.setKeyboardPalette(settings.kbColorMode ?? 0, [
+        settings.kbColorA ?? '#22e0e6',
+        settings.kbColorB ?? '#2b6cf0',
+        settings.kbColorC ?? '#e14ec4',
+      ]);
       engine3d?.setKeyboardLightsOff(settings.kbLightsOff !== false);
       engine3d?.setKeyboardRgb(
         settings.kbRgbMode ?? 1,
