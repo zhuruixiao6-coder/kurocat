@@ -79,10 +79,14 @@
             <span>键盘灯效</span>
             <span class="menu-check" id="kb-rgb-mode">渐变</span>
           </button>
-          <button class="menu-item" data-action="cycle-kb-rgb-bright" title="键盘灯效亮度：低 / 中 / 高">
-            <span>灯效亮度</span>
-            <span class="menu-check" id="kb-rgb-bright">中</span>
-          </button>
+          <div class="scale-slider-wrap" style="padding: 6px 12px 10px;">
+            <input type="range" id="kb-rgb-slider" class="scale-slider" min="0" max="150" step="5" value="85" />
+            <div class="scale-ticks">
+              <span>暗</span>
+              <span class="scale-tick-mid">键盘灯亮度 <b id="kb-rgb-value">85%</b></span>
+              <span>亮</span>
+            </div>
+          </div>
           <button class="menu-item" data-action="cycle-kb-rgb-speed" title="键盘灯效速度：慢 / 正常 / 快">
             <span>灯效速度</span>
             <span class="menu-check" id="kb-rgb-speed">正常</span>

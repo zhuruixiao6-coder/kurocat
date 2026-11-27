@@ -915,23 +915,38 @@ export class KeyboardAndMouse3D {
         uniform float uTime; uniform float uBright; uniform float uMode;
         uniform vec3 uColA; uniform vec3 uColB;
         varying vec2 vUv;
+
+        // HSV → RGB，用来做整片彩虹，而不是两色渐变
+        vec3 hsv2rgb(vec3 c) {
+          vec3 rgb = clamp(abs(mod(c.x * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+          return c.z * mix(vec3(1.0), rgb, c.y);
+        }
+
         void main() {
           float g;
+          vec3 col;
           if (uMode < 1.5) {
-            // 渐变：沿键盘横向缓慢流动的色相过渡
-            float t = vUv.x + sin(uTime * 0.25) * 0.08;
-            g = 0.62 + 0.38 * sin(t * 6.2832 + uTime * 0.6);
+            // 彩虹渐变：整排色相随横向铺开，并缓慢流动、轻微呼吸
+            float hue = fract(vUv.x * 0.9 + uTime * 0.06);
+            float sat = 0.92;
+            col = hsv2rgb(vec3(hue, sat, 1.0));
+            g = 0.72 + 0.28 * sin(vUv.x * 12.566 + uTime * 1.2);
           } else if (uMode < 2.5) {
-            // 呼吸：整片同色，亮度缓慢起伏
-            g = 0.45 + 0.55 * (0.5 + 0.5 * sin(uTime * 1.5));
+            // 彩虹呼吸：色相整体缓慢旋转 + 亮度起伏，像呼吸灯但仍有色彩流动
+            float hue = fract(uTime * 0.05 + vUv.y * 0.25);
+            col = hsv2rgb(vec3(hue, 0.88, 1.0));
+            g = 0.45 + 0.55 * (0.5 + 0.5 * sin(uTime * 1.45));
           } else {
-            // 流光：斜向扫过的高亮带
-            float band = fract(vUv.x * 1.15 - vUv.y * 0.35 - uTime * 0.22);
-            g = smoothstep(0.0, 0.28, band) * (1.0 - smoothstep(0.30, 0.72, band));
-            g = 0.12 + 0.88 * g;
+            // 流光：斜向扫过的彩色光带，带宽处饱和、带外留一点底色
+            float band = fract(vUv.x * 1.05 - vUv.y * 0.35 - uTime * 0.20);
+            float sweep = smoothstep(0.0, 0.22, band) * (1.0 - smoothstep(0.26, 0.78, band));
+            float hue = fract(vUv.x * 0.75 - uTime * 0.12 + band * 0.35);
+            col = hsv2rgb(vec3(hue, 0.95, 1.0));
+            g = 0.14 + 0.86 * sweep;
           }
-          vec3 col = mix(uColA, uColB, clamp(vUv.x * 0.85 + 0.08, 0.0, 1.0));
-          gl_FragColor = vec4(col * g * uBright, g * uBright * 0.85);
+          // 与主色轻微混合，让自定义颜色能"染色"，但默认仍是全彩
+          col = mix(col, uColA, 0.12);
+          gl_FragColor = vec4(col * g * uBright, g * uBright * 0.88);
         }
       `,
     });

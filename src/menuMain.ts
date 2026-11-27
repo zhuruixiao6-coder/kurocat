@@ -125,6 +125,7 @@ const menuEl = document.getElementById('context-menu') as HTMLDivElement;
 const tabBodyEl = document.getElementById('menu-tab-body') as HTMLDivElement | null;
 const breedPillsEl = document.getElementById('breed-pills') as HTMLDivElement;
 const scaleSliderEl = document.getElementById('scale-slider') as HTMLInputElement;
+const kbRgbSliderEl = document.getElementById('kb-rgb-slider') as HTMLInputElement | null;
 const scaleValueEl = document.getElementById('scale-value') as HTMLButtonElement;
 const tailModeBadgeEl = document.getElementById('tail-mode-badge') as HTMLSpanElement;
 const tailKeysCountEl = document.getElementById('tail-keys-count') as HTMLSpanElement;
@@ -983,9 +984,13 @@ function syncUI(): void {
     const rgbMode = settings.kbRgbMode ?? 1;
     const mEl = document.getElementById('kb-rgb-mode');
     if (mEl) mEl.textContent = `${rgbMode > 0 ? '✓' : '○'} ${modeNames[rgbMode] ?? '渐变'}`;
-    const bright = settings.kbRgbBright ?? -1;
-    const bEl = document.getElementById('kb-rgb-bright');
-    if (bEl) bEl.textContent = bright < 0 ? '○ 默认' : `✓ ${bright < 0.5 ? '低' : bright < 1.0 ? '中' : '高'}`;
+    const brightPct = Math.round(((settings.kbRgbBright ?? -1) < 0 ? 0.85 : (settings.kbRgbBright as number)) * 100);
+    if (kbRgbSliderEl) {
+      kbRgbSliderEl.value = String(brightPct);
+      kbRgbSliderEl.style.setProperty('--pct', `${Math.min(100, (brightPct / 150) * 100).toFixed(1)}%`);
+    }
+    const bv = document.getElementById('kb-rgb-value');
+    if (bv) bv.textContent = `${brightPct}%`;
     const spd = settings.kbRgbSpeed ?? 0;
     const spEl = document.getElementById('kb-rgb-speed');
     if (spEl) spEl.textContent = spd <= 0 ? '○ 默认' : `✓ ${spd < 0.7 ? '慢' : spd > 1.4 ? '快' : '正常'}`;
@@ -1291,6 +1296,19 @@ async function bootstrap(): Promise<void> {
     });
   }
 
+  if (kbRgbSliderEl) {
+    let rgbTimer: number | undefined;
+    kbRgbSliderEl.addEventListener('input', () => {
+      const val = Math.max(0, Math.min(150, Number(kbRgbSliderEl.value))) / 100;
+      const label = document.getElementById('kb-rgb-value');
+      if (label) label.textContent = `${Math.round(val * 100)}%`;
+      if (rgbTimer) window.clearTimeout(rgbTimer);
+      rgbTimer = window.setTimeout(() => {
+        void applySettingsPatch({ kbRgbBright: val });
+      }, 90);
+    });
+  }
+
   if (scaleSliderEl) {
     scaleSliderEl.addEventListener('pointerdown', () => {
       sliderDragging = true;
@@ -1484,13 +1502,6 @@ async function bootstrap(): Promise<void> {
       case 'cycle-kb-rgb-mode': {
         const next = ((settings.kbRgbMode ?? 1) + 1) % 4;
         void applySettingsPatch({ kbRgbMode: next });
-        break;
-      }
-      case 'cycle-kb-rgb-bright': {
-        const steps = [-1, 0.35, 0.85, 1.25];
-        const cur = settings.kbRgbBright ?? -1;
-        const next = steps[(steps.indexOf(cur) + 1) % steps.length] ?? -1;
-        void applySettingsPatch({ kbRgbBright: next });
         break;
       }
       case 'cycle-kb-rgb-speed': {
