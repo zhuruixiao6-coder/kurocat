@@ -769,6 +769,8 @@ export class KuroCatEngine3D {
   private strokes: number[] = [];
   private excite = 0;
   private tailPhase = 0;
+  // 三段尾骨：根部硬、中段软、尾尖最软（弹簧驱动，带过冲与回弹）
+  private readonly tailBone = [new Spring1D(0, 7.2, 0.62), new Spring1D(0, 5.2, 0.48), new Spring1D(0, 3.4, 0.34)];
 
   // —— 空闲自动玩耍（idle play）——
   private playEnabled = true;
@@ -3031,6 +3033,13 @@ export class KuroCatEngine3D {
     const swayRate = mix(1.0, 2.5, this.excite) * (1 - 0.75 * this.sleepAmt);
     this.tailPhase += dt * swayRate;
     const tailSway = (1 - 0.7 * this.sleepAmt) * (1 + 0.42 * curious) + (act && act.kind === 'tail' ? 1.35 * actEnv : 0) + this.playTailWag;
+    // 骨骼目标：越靠尾尖摆幅越大、相位越滞后 —— 软而有弹性，不是整条一起摆
+    for (let b = 0; b < 3; b += 1) {
+      const lag = b * 0.62;
+      const amp = (0.42 + b * 0.26) * tailSway;
+      const tgt = Math.sin(this.tailPhase * 1.18 - lag) * amp;
+      this.tailBone[b].step(tgt, dt);
+    }
 
     const attached = this.tmpTailAttached;
     const loose = this.tmpTailLoose;
@@ -3046,8 +3055,15 @@ export class KuroCatEngine3D {
         tmpTail.z += this.thumpLash * 0.34 * w ** 1.5;
         pt.lerp(tmpTail, cross);
       }
-      pt.x += Math.sin(this.tailPhase * 1.5 + i * 0.68) * 0.045 * w * tailSway;
-      pt.y += Math.sin(this.tailPhase * 1.25 + i * 0.85) * 0.05 * w * w * tailSway;
+      // 三段骨骼累计角度 → 连续的尾巴曲线（根部几乎不动，尾尖摆幅最大）
+      let acc = 0;
+      for (let b = 0; b < 3; b += 1) {
+        const segW = clamp((w - b * 0.30) / 0.36, 0, 1);
+        acc += this.tailBone[b].x * segW;
+      }
+      pt.x += acc * 0.15;
+      pt.y += this.tailBone[2].x * 0.055 * w * w;
+      pt.z += acc * 0.05 * w;
       this.attachLocal(pt, attached);
       loose.copy(pt).add(this.homePos);
       pt.lerpVectors(attached, loose, smoothstep(0.1, 0.7, w));
