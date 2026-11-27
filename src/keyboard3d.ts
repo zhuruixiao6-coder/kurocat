@@ -492,6 +492,7 @@ function createInstancedKeyTopMaterial(atlasTex: THREE.CanvasTexture): THREE.Sha
   return new THREE.ShaderMaterial({
     uniforms: {
       uAtlas: { value: atlasTex },
+      uKeyTint: { value: new THREE.Color('#ffffff') }, // 纯色模式下给键帽整体染色
     },
     vertexShader: `
       attribute vec4 aUvRect;
@@ -511,11 +512,12 @@ function createInstancedKeyTopMaterial(atlasTex: THREE.CanvasTexture): THREE.Sha
     `,
     fragmentShader: `
       uniform sampler2D uAtlas;
+      uniform vec3 uKeyTint;
       varying vec2 vAtlasUv;
       varying vec3 vTint;
       void main() {
         vec4 texel = texture2D(uAtlas, vAtlasUv);
-        gl_FragColor = vec4(texel.rgb * vTint, 1.0);
+        gl_FragColor = vec4(texel.rgb * vTint * uKeyTint, 1.0);
         #include <colorspace_fragment>
       }
     `,
@@ -545,6 +547,8 @@ export class KeyboardAndMouse3D {
   public readonly boardGroup = new THREE.Group();
   /** 键下 RGB 灯层（加色混合，压在键帽之下、定位板之上） */
   private rgbPlane: THREE.Mesh | null = null;
+  private rgbWash: THREE.Mesh | null = null;
+  private keyTopMat: THREE.ShaderMaterial | null = null;
   private rgbTime = 0;
   private rgbState = { mode: 1, color: '#22e0e6', bright: 0.85, speed: 1 };
   private lightsOff = false;
@@ -901,10 +905,11 @@ export class KeyboardAndMouse3D {
         uTime: { value: 0 },
         uBright: { value: this.rgbState.bright },
         uMode: { value: this.rgbState.mode },
-        uColA: { value: new THREE.Color(this.rgbState.color) },
-        uColB: { value: new THREE.Color('#2b6cf0') },
-        uColC: { value: new THREE.Color('#e14ec4') },
-        uColorMode: { value: 0 },
+        uColA: { value: new THREE.Color(this.paletteColors[0]) },
+        uColB: { value: new THREE.Color(this.paletteColors[1]) },
+        uColC: { value: new THREE.Color(this.paletteColors[2]) },
+        uColorMode: { value: this.paletteMode },
+        uAlpha: { value: 1.0 },
       },
       transparent: true,
       depthWrite: false,
@@ -920,6 +925,7 @@ export class KeyboardAndMouse3D {
         uniform float uTime; uniform float uBright; uniform float uMode;
         uniform vec3 uColA; uniform vec3 uColB; uniform vec3 uColC;
         uniform float uColorMode; // 0=彩虹 1=纯色 2=混色
+        uniform float uAlpha; // 强度乘子（键帽上方那层用低值）
         varying vec2 vUv;
 
         // HSV → RGB，用来做整片彩虹，而不是两色渐变
@@ -973,7 +979,7 @@ export class KeyboardAndMouse3D {
           // 轻度软压缩，避免高亮过曝刺眼
           float lit = g * uBright;
           lit = lit / (1.0 + lit * 0.35);
-          gl_FragColor = vec4(col * lit * 1.25, lit * 0.95);
+          gl_FragColor = vec4(col * lit * 1.25, lit * 0.95 * uAlpha);
         }
       `,
     });
@@ -984,6 +990,19 @@ export class KeyboardAndMouse3D {
     this.rgbPlane = rgbPlane;
     this.boardDisposables.push(rgbGeo);
     this.boardGroup.add(rgbPlane);
+
+    // 键帽上方的淡色染色层：让「选了什么色」一眼可见，同时保持柔和
+    const washMat = rgbMat.clone();
+    washMat.uniforms = THREE.UniformsUtils.clone(rgbMat.uniforms);
+    washMat.uniforms.uAlpha.value = 0.38;
+    const washGeo = new THREE.PlaneGeometry(W - 0.10, D - 0.08);
+    const washPlane = new THREE.Mesh(washGeo, washMat);
+    washPlane.rotation.x = -Math.PI / 2;
+    washPlane.position.set(0, this.boardH + this.capH + 0.004, 0.012);
+    washPlane.renderOrder = 4;
+    this.rgbWash = washPlane;
+    this.boardDisposables.push(washGeo);
+    this.boardGroup.add(washPlane);
 
     // ROG 75% 右上角的屏幕 + 旋钮（参考图那块深色小面板）
     if (pal?.screen ?? isRog) {
@@ -1071,6 +1090,8 @@ export class KeyboardAndMouse3D {
     topGeo.setAttribute('aTint', tintAttr);
 
     const topMat = createInstancedKeyTopMaterial(atlas.tex);
+    this.keyTopMat = topMat;
+    this.applyKeyTint();
     const topInst = new THREE.InstancedMesh(topGeo, topMat, keyCount);
     topInst.frustumCulled = false;
     this.boardDisposables.push(topGeo, topMat);
@@ -1230,16 +1251,28 @@ export class KeyboardAndMouse3D {
     return out.set(0, 0.115, -0.05).applyMatrix4(this.mouseShape.matrixWorld);
   }
 
+  /** 纯色模式下把键帽朝所选颜色染过去，保证"选了什么色一眼看得见" */
+  private applyKeyTint(): void {
+    if (!this.keyTopMat) return;
+    const target = new THREE.Color('#ffffff');
+    if (this.paletteMode === 1) target.lerp(new THREE.Color(this.paletteColors[0]), 0.62);
+    (this.keyTopMat.uniforms.uKeyTint.value as THREE.Color).copy(target);
+  }
+
   /** 配色：0 彩虹 / 1 纯色 / 2 混色（三色） */
   public setPaletteMode(mode: number, colors: [string, string, string]): void {
     const mat = this.rgbPlane?.material as THREE.ShaderMaterial | undefined;
     this.paletteMode = mode;
     this.paletteColors = colors;
-    if (!mat) return;
-    mat.uniforms.uColorMode.value = mode;
-    (mat.uniforms.uColA.value as THREE.Color).set(colors[0]);
-    (mat.uniforms.uColB.value as THREE.Color).set(colors[1]);
-    (mat.uniforms.uColC.value as THREE.Color).set(colors[2]);
+    this.rgbState.color = colors[0];
+    this.applyKeyTint();
+    const mats = [mat, this.rgbWash?.material as THREE.ShaderMaterial | undefined].filter(Boolean) as THREE.ShaderMaterial[];
+    for (const m of mats) {
+      m.uniforms.uColorMode.value = mode;
+      (m.uniforms.uColA.value as THREE.Color).set(colors[0]);
+      (m.uniforms.uColB.value as THREE.Color).set(colors[1]);
+      (m.uniforms.uColC.value as THREE.Color).set(colors[2]);
+    }
   }
 
   /** 键盘总灯光开关：true = 全部熄灭（RGB 灯层 + 按键按下的发光） */
@@ -1273,12 +1306,19 @@ export class KeyboardAndMouse3D {
     if (this.rgbPlane) {
       const on = !this.lightsOff && this.rgbState.mode > 0 && this.rgbState.bright > 0.01;
       this.rgbPlane.visible = on;
+      if (this.rgbWash) this.rgbWash.visible = on;
       if (on) {
         this.rgbTime += dt * this.rgbState.speed;
-        const mat = this.rgbPlane.material as THREE.ShaderMaterial;
-        mat.uniforms.uTime.value = this.rgbTime;
-        mat.uniforms.uBright.value = this.rgbState.bright;
-        mat.uniforms.uMode.value = this.rgbState.mode;
+        const mats = [this.rgbPlane.material, this.rgbWash?.material].filter(Boolean) as THREE.ShaderMaterial[];
+        for (const mat of mats) {
+          mat.uniforms.uTime.value = this.rgbTime;
+          mat.uniforms.uBright.value = this.rgbState.bright;
+          mat.uniforms.uMode.value = this.rgbState.mode;
+          mat.uniforms.uColorMode.value = this.paletteMode;
+          (mat.uniforms.uColA.value as THREE.Color).set(this.paletteColors[0]);
+          (mat.uniforms.uColB.value as THREE.Color).set(this.paletteColors[1]);
+          (mat.uniforms.uColC.value as THREE.Color).set(this.paletteColors[2]);
+        }
       }
     }
 
