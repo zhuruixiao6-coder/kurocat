@@ -37,6 +37,8 @@ interface AppSettings {
   alwaysOnTop: boolean;
   clickThroughLocked: boolean;
   showKeyBubbles: boolean;
+  idlePlay?: boolean;
+  idlePlaySec?: number;
   soundEnabled: boolean;
   keySoundEnabled?: boolean;
   keySoundVolume?: number;
@@ -150,6 +152,8 @@ let settings: AppSettings = {
   alwaysOnTop: true,
   clickThroughLocked: false,
   showKeyBubbles: true,
+  idlePlay: true,
+  idlePlaySec: 30,
   soundEnabled: true,
   keySoundEnabled: true,
   keySoundVolume: 55,
@@ -405,6 +409,7 @@ function syncEngine3DState(): void {
   engine3d.setGameActive(gameActive);
   engine3d.setKeyboardConfig(kbLayout, kbOrient);
   engine3d.setTailKeyConfig(tailMode, tailIds);
+  engine3d.setIdlePlay(settings.idlePlay !== false, settings.idlePlaySec ?? 30);
   engine3d.setPrivacyMode(privacyActive);
   engine3d.resize();
 }
@@ -1219,6 +1224,7 @@ async function bootstrap(): Promise<void> {
     const prevLock = lastKnownLockState;
     settings = ev.payload;
     lastKnownLockState = settings.clickThroughLocked;
+    engine3d?.setIdlePlay(settings.idlePlay !== false, settings.idlePlaySec ?? 30);
     syncMenuUI();
     if (prevLock !== null && prevLock !== settings.clickThroughLocked) {
       if (settings.clickThroughLocked) {

@@ -24,6 +24,8 @@ interface AppSettings {
   alwaysOnTop: boolean;
   clickThroughLocked: boolean;
   showKeyBubbles: boolean;
+  idlePlay?: boolean;
+  idlePlaySec?: number;
   soundEnabled: boolean;
   autostart: boolean;
   catBreed: string;
@@ -85,6 +87,8 @@ let settings: AppSettings = {
   alwaysOnTop: true,
   clickThroughLocked: false,
   showKeyBubbles: true,
+  idlePlay: true,
+  idlePlaySec: 30,
   soundEnabled: true,
   autostart: false,
   catBreed: 'black',
@@ -961,6 +965,9 @@ function syncUI(): void {
 
   setCheck('chk-privacy', settings.privacyPasswordGuard !== false);
   setCheck('chk-bubbles', settings.showKeyBubbles);
+  setCheck('chk-idle-play', settings.idlePlay !== false);
+  const idleValEl = document.getElementById('val-idle-threshold');
+  if (idleValEl) idleValEl.textContent = `${settings.idlePlaySec ?? 30} 秒`;
   setCheck('chk-fish-bubble', fishProfile?.bubble !== false);
   setCheck('chk-lock', settings.clickThroughLocked);
   setCheck('chk-sound', settings.soundEnabled);
@@ -1445,6 +1452,16 @@ async function bootstrap(): Promise<void> {
       case 'toggle-bubbles':
         void applySettingsPatch({ showKeyBubbles: !settings.showKeyBubbles });
         break;
+      case 'toggle-idle-play':
+        void applySettingsPatch({ idlePlay: settings.idlePlay === false });
+        break;
+      case 'cycle-idle-threshold': {
+        const steps = [15, 30, 60, 120];
+        const cur = settings.idlePlaySec ?? 30;
+        const next = steps[(steps.indexOf(cur) + 1) % steps.length] ?? 30;
+        void applySettingsPatch({ idlePlaySec: next });
+        break;
+      }
       case 'toggle-fish-bubble':
         void invoke<FishProfile>('set_bubble_enabled', {
           enabled: !(fishProfile?.bubble !== false),

@@ -75,6 +75,8 @@ interface Fx3D {
   baseX: number;
 }
 
+type PlayKind3D = 'tailChase' | 'pounce' | 'swat' | 'circle' | 'stretch' | 'yawn';
+
 interface IdleAct3D {
   kind: 'tilt' | 'ear' | 'slowBlink' | 'look' | 'tail';
   t0: number;
@@ -756,6 +758,26 @@ export class KuroCatEngine3D {
   private strokes: number[] = [];
   private excite = 0;
   private tailPhase = 0;
+
+  // —— 空闲自动玩耍（idle play）——
+  private playEnabled = true;
+  private playThreshold = 30; // 秒
+  private playActive = false;
+  private playAct: { kind: PlayKind3D; t0: number; dur: number } | null = null;
+  private playNextAt = 0;
+  private playHistory: PlayKind3D[] = [];
+  private playLean = 0;
+  private playSquash = 0;
+  private playHeadPitch = 0;
+  private playHeadYaw = 0;
+  private playTailWag = 0;
+  private playSquint = 0;
+  private playYaw = 0;
+  private playLift = 0;
+  private playArmL = 0;
+  private playArmR = 0;
+  private playReach = 0;
+  private playSwing = 0;
   private annoy = 0;
   private lastPoke = -100;
   private isCross = false;
@@ -2038,6 +2060,189 @@ export class KuroCatEngine3D {
     }
   }
 
+  /** 空闲自动玩耍：启用/阈值（秒）。不接触任何输入钩子，只读 lastInput。 */
+  public setIdlePlay(enabled: boolean, thresholdSec: number): void {
+    this.playEnabled = enabled;
+    this.playThreshold = Math.max(5, Math.min(1800, thresholdSec || 30));
+    if (!enabled) this.stopIdlePlay();
+  }
+
+  private stopIdlePlay(): void {
+    this.playActive = false;
+    this.playAct = null;
+    this.playNextAt = 0;
+    this.playLean = 0;
+    this.playSquash = 0;
+    this.playHeadPitch = 0;
+    this.playHeadYaw = 0;
+    this.playTailWag = 0;
+    this.playSquint = 0;
+    this.playYaw = 0;
+    this.playLift = 0;
+    this.catRoot.rotation.y = 0;
+    this.catRoot.position.copy(this.homePos);
+  }
+
+  /** 每帧：判定是否进入/退出玩耍，并推进当前动作 */
+  private updateIdlePlay(t: number, dt: number): void {
+    void dt;
+    const idle = t - this.lastInput;
+    const canPlay =
+      this.playEnabled && !this.asleep && !this.privacyMode && idle >= this.playThreshold;
+
+    if (!canPlay) {
+      if (this.playActive) this.stopIdlePlay();
+      return;
+    }
+    if (!this.playActive) {
+      this.playActive = true;
+      this.playNextAt = t + 0.6;
+    }
+    if (!this.playAct && t >= this.playNextAt) this.startPlayAct(t);
+    if (this.playAct) {
+      const a = this.playAct;
+      const k = clamp((t - a.t0) / a.dur, 0, 1);
+      this.applyPlayPose(a.kind, k);
+      if (k >= 1) {
+        this.playAct = null;
+        this.playNextAt = t + 0.9 + Math.random() * 0.7;
+      }
+    }
+    this.catRoot.rotation.y = this.playYaw;
+    this.catRoot.position.set(this.homePos.x, this.homePos.y + this.playLift, this.homePos.z);
+  }
+
+  private startPlayAct(t: number): void {
+    const all: PlayKind3D[] = ['tailChase', 'pounce', 'swat', 'circle', 'stretch', 'yawn'];
+    // 最近两次不重复，避免短时间内来回同一套
+    const pool = all.filter((k) => !this.playHistory.includes(k));
+    const kind = (pool.length ? pool : all)[Math.floor(Math.random() * (pool.length || all.length))];
+    this.playHistory.push(kind);
+    if (this.playHistory.length > 2) this.playHistory.shift();
+    const dur: Record<PlayKind3D, number> = {
+      tailChase: 2.6,
+      pounce: 2.2,
+      swat: 1.9,
+      circle: 3.4,
+      stretch: 2.8,
+      yawn: 3.0,
+    };
+    this.playAct = { kind, t0: t, dur: dur[kind] };
+    this.playLean = 0;
+    this.playSquash = 0;
+    this.playHeadPitch = 0;
+    this.playHeadYaw = 0;
+    this.playTailWag = 0;
+    this.playSquint = 0;
+    this.playYaw = 0;
+    this.playLift = 0;
+  }
+
+  /** 各动作的姿态曲线：0..1 的时间片 → 身体倾斜/挤压/头部/尾巴参数 */
+  private applyPlayPose(kind: PlayKind3D, k: number): void {
+    const ease = (x: number) => (x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2);
+    const bell = Math.sin(Math.PI * k);
+    this.playLean = 0;
+    this.playSquash = 0;
+    this.playHeadPitch = 0;
+    this.playHeadYaw = 0;
+    this.playTailWag = 0;
+    this.playSquint = 0;
+    this.playArmL = 0;
+    this.playArmR = 0;
+    this.playReach = 0;
+    this.playSwing = 0;
+
+    switch (kind) {
+      case 'tailChase': {
+        // 原地转一圈追尾巴：身体跟着转、头看向尾巴、尾巴甩得快
+        this.playYaw = ease(k) * Math.PI * 2;
+        this.playTailWag = 2.4 * bell;
+        this.playHeadYaw = -0.34 * Math.sin(k * Math.PI * 2);
+        this.playLean = 0.05 * Math.sin(k * Math.PI * 2);
+        // 交替抬爪：左右反相，像追尾巴时的小碎步
+        const step = Math.sin(k * Math.PI * 4);
+        this.playArmL = 0.06 + 0.03 * step;
+        this.playArmR = 0.06 - 0.03 * step;
+        this.playSwing = 0.02 * step;
+        break;
+      }
+      case 'pounce': {
+        // 先压低蓄力，再向前一跳
+        if (k < 0.36) {
+          const c = k / 0.36;
+          this.playSquash = 0.16 * c;
+          this.playLean = 0.10 * c;
+          this.playHeadPitch = 0.10 * c;
+          this.playArmL = -0.02 * c;
+          this.playArmR = -0.02 * c;
+        } else {
+          const j = (k - 0.36) / 0.64;
+          this.playLift = 0.24 * Math.sin(Math.PI * Math.min(1, j * 1.15));
+          this.playSquash = -0.05 * Math.sin(Math.PI * j);
+          this.playLean = 0.16 * Math.sin(Math.PI * j);
+          this.playHeadPitch = -0.08 * Math.sin(Math.PI * j);
+          this.playTailWag = 1.2 * Math.sin(Math.PI * j);
+          this.playReach = 0.06 * Math.sin(Math.PI * j);
+          this.playArmL = 0.05 * Math.sin(Math.PI * j);
+          this.playArmR = 0.05 * Math.sin(Math.PI * j);
+        }
+        break;
+      }
+      case 'swat': {
+        // 左右各拍一下
+        const s = Math.sin(k * Math.PI * 3);
+        this.playLean = 0.14 * s;
+        this.playHeadYaw = 0.16 * s;
+        this.playSquash = 0.05 * Math.abs(s);
+        this.playTailWag = 0.8 * Math.abs(s);
+        // 右爪抬起横扫，左爪撑地
+        this.playArmR = 0.12 * Math.abs(s);
+        this.playArmL = -0.01 * Math.abs(s);
+        this.playSwing = 0.05 * s;
+        break;
+      }
+      case 'circle': {
+        // 慢慢绕半圈，身体侧倾
+        this.playYaw = ease(k) * Math.PI * 1.1;
+        this.playLean = 0.07 * Math.sin(k * Math.PI * 2);
+        this.playHeadYaw = -0.12 * Math.sin(k * Math.PI * 2);
+        this.playTailWag = 0.9 * bell;
+        // 迈步：左右腿交替，重心跟着侧移
+        const gait = Math.sin(k * Math.PI * 4);
+        this.playArmL = 0.03 + 0.025 * gait;
+        this.playArmR = 0.03 - 0.025 * gait;
+        this.playSwing = 0.03 * gait;
+        this.playLean += 0.05 * gait;
+        break;
+      }
+      case 'stretch': {
+        // 前伸伸展 + 抬屁股
+        this.playLean = 0.42 * bell;
+        this.playSquash = -0.09 * bell;
+        this.playHeadPitch = 0.18 * bell;
+        this.playTailWag = 0.5 * bell;
+        // 前爪向前伸（伸展的主动作由手臂完成，身体只是跟着前倾）
+        this.playReach = 0.10 * bell;
+        this.playArmL = 0.07 * bell;
+        this.playArmR = 0.07 * bell;
+        break;
+      }
+      case 'yawn': {
+        // 仰头打哈欠、眯眼、耳朵略后压
+        this.playHeadPitch = -0.26 * bell;
+        this.playSquint = 0.92 * bell;
+        this.playSquash = 0.06 * bell;
+        this.playTailWag = 0.35 * bell;
+        this.playArmL = 0.015 * bell;
+        this.playArmR = 0.015 * bell;
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
   public getSleepStatus(): { asleep: boolean; sleepAmt: number; idleSec: number; sleepAfterSec: number } {
     return {
       asleep: this.asleep,
@@ -2466,9 +2671,11 @@ export class KuroCatEngine3D {
     const cps = this.strokes.length;
     this.excite += (Math.min(1, cps / 7.5) - this.excite) * approach(7.5, dt);
 
-    const sleepAfterSec = this.embedded ? 18 : 28;
+    this.updateIdlePlay(t, dt);
+    const baseSleep = this.embedded ? 18 : 28;
+    const sleepAfterSec = this.playEnabled ? Math.max(baseSleep, this.playThreshold + 90) : baseSleep;
     const idleSec = t - this.lastInput;
-    if (!this.asleep && !this.privacyMode && !this.petting && idleSec > sleepAfterSec) {
+    if (!this.asleep && !this.privacyMode && !this.petting && !this.playActive && idleSec > sleepAfterSec) {
       this.asleep = true;
       this.isCross = false;
       this.idleAct = null;
@@ -2485,6 +2692,7 @@ export class KuroCatEngine3D {
     }
     const petActive = this.petting && !this.privacyMode && !this.isCross;
     this.squintAmt += ((petActive ? 1 : 0) - this.squintAmt) * approach(12, dt);
+    if (this.playSquint > 0.01) this.squintAmt = Math.max(this.squintAmt, this.playSquint);
 
     // Curious trigger from swift cursor sweep
     this.pointerSamples = this.pointerSamples.filter((s) => t - s.t <= 0.22);
@@ -2564,7 +2772,7 @@ export class KuroCatEngine3D {
           ? this.paws.R
           : null;
 
-    let targetShift = 0;
+    let targetShift = this.playLean;
     if (mousing) targetShift = -0.24;
     else if (striking && striking.keyId) {
       const kt = this.desk.keyTopWorld(striking.keyId, this.tmpV1);
@@ -2573,14 +2781,15 @@ export class KuroCatEngine3D {
       targetShift = 0.08 * this.tailTap.reach;
     }
 
-    const targetHunch = typingActive
+    const targetHunch = (typingActive
       ? 0.09 + 0.08 * this.excite
-      : curious * 0.07 + (petActive ? -0.05 : 0);
+      : curious * 0.07 + (petActive ? -0.05 : 0)) + this.playSquash * 0.6;
     const targetSquash =
       this.sleepAmt * 0.20 +
       (petActive ? 0.06 : 0) -
       curious * 0.04 +
-      Math.sin(t * 2.0) * 0.014;
+      Math.sin(t * 2.0) * 0.014 +
+      this.playSquash;
 
     this.bend.x = this.sShift.step(targetShift, dt);
     this.bend.z = this.sHunch.step(targetHunch, dt);
@@ -2621,6 +2830,9 @@ export class KuroCatEngine3D {
       targetGazeX = bias * 0.68;
       targetGazeY = -0.52;
     }
+
+    targetYaw += this.playHeadYaw;
+    targetPitch += this.playHeadPitch;
 
     if (act) {
       if (act.kind === 'tilt') targetRoll += act.side * 0.19 * actEnv;
@@ -2768,7 +2980,7 @@ export class KuroCatEngine3D {
 
     const swayRate = mix(1.0, 2.5, this.excite) * (1 - 0.75 * this.sleepAmt);
     this.tailPhase += dt * swayRate;
-    const tailSway = (1 - 0.7 * this.sleepAmt) * (1 + 0.42 * curious) + (act && act.kind === 'tail' ? 1.35 * actEnv : 0);
+    const tailSway = (1 - 0.7 * this.sleepAmt) * (1 + 0.42 * curious) + (act && act.kind === 'tail' ? 1.35 * actEnv : 0) + this.playTailWag;
 
     const attached = this.tmpTailAttached;
     const loose = this.tmpTailLoose;
@@ -2892,6 +3104,18 @@ export class KuroCatEngine3D {
         // Cute chubby plush kitten arms (matches approved 2D arm optimization — shorter & fuller!)
         (u) => mix(0.118, 0.082, smoothstep(0.0, 0.88, u)) * mix(1.0, 0.76, tuck * (1 - u * 0.4)),
       );
+
+      // 空闲玩耍：让手臂自己抬/伸/摆，形成真实的肢体动作（不是整体滑动）
+      if (this.playActive) {
+        const sideLift = arm.s < 0 ? this.playArmL : this.playArmR;
+        const swing = this.playSwing * arm.s;
+        arm.hand.x += swing;
+        arm.hand.y += sideLift;
+        arm.hand.z += this.playReach;
+        arm.c1.y += sideLift * 0.55 + 0.02;
+        arm.c2.y += sideLift * 0.75;
+        arm.c2.z += this.playReach * 0.4;
+      }
 
       // Soft sculpted plush paw resting cleanly right behind top edge of keyboard when calm
       const pawScale = mix(1.0, 0.94, tuck);
