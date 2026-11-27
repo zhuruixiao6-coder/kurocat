@@ -547,6 +547,7 @@ export class KeyboardAndMouse3D {
   private rgbPlane: THREE.Mesh | null = null;
   private rgbTime = 0;
   private rgbState = { mode: 1, color: '#22e0e6', bright: 0.85, speed: 1 };
+  private lightsOff = false;
   public readonly mouseGroup = new THREE.Group();
   public readonly deskGroup = new THREE.Group();
 
@@ -926,11 +927,14 @@ export class KeyboardAndMouse3D {
           float g;
           vec3 col;
           if (uMode < 1.5) {
-            // 彩虹渐变：整排色相随横向铺开，并缓慢流动、轻微呼吸
-            float hue = fract(vUv.x * 0.9 + uTime * 0.06);
-            float sat = 0.92;
+            // 彩虹渐变：色相铺满整排 + 三层光带叠加以增强层次
+            float hue = fract(vUv.x * 1.05 + uTime * 0.07);
+            float sat = 0.95;
             col = hsv2rgb(vec3(hue, sat, 1.0));
-            g = 0.72 + 0.28 * sin(vUv.x * 12.566 + uTime * 1.2);
+            float layer1 = 0.78 + 0.22 * sin(vUv.x * 9.42 + uTime * 0.9);        // 主光带
+            float layer2 = 0.16 * sin(vUv.x * 21.99 - uTime * 1.6);               // 细密流动
+            float layer3 = 0.10 * sin(vUv.y * 6.28 + uTime * 0.55);               // 纵向缓慢起伏
+            g = layer1 + layer2 + layer3;
           } else if (uMode < 2.5) {
             // 彩虹呼吸：色相整体缓慢旋转 + 亮度起伏，像呼吸灯但仍有色彩流动
             float hue = fract(uTime * 0.05 + vUv.y * 0.25);
@@ -944,11 +948,17 @@ export class KeyboardAndMouse3D {
             col = hsv2rgb(vec3(hue, 0.95, 1.0));
             g = 0.14 + 0.86 * sweep;
           }
-          // 各模式亮度归一：统一压到 0.62~1.0，切换模式不再出现"变暗"
-          g = 0.62 + 0.38 * clamp(g, 0.0, 1.0);
-          // 只留 4% 主色染色，避免高饱和彩虹被冲淡
-          col = mix(col, uColA, 0.04);
-          gl_FragColor = vec4(col * g * uBright, g * uBright * 0.88);
+          // 亮度归一但保留对比：0.55~1.12，浅色键帽上也能看清光带层次
+          g = 0.55 + 0.57 * clamp(g, 0.0, 1.0);
+          // 边缘柔化：靠外侧渐弱，形成自然光晕而不是硬边
+          float halo = smoothstep(0.0, 0.12, vUv.x) * smoothstep(0.0, 0.12, 1.0 - vUv.x);
+          g *= mix(0.82, 1.0, halo);
+          // 只留 3% 主色染色，保持彩虹饱和
+          col = mix(col, uColA, 0.03);
+          // 轻度软压缩，避免高亮过曝刺眼
+          float lit = g * uBright;
+          lit = lit / (1.0 + lit * 0.35);
+          gl_FragColor = vec4(col * lit * 1.25, lit * 0.95);
         }
       `,
     });
@@ -1205,6 +1215,15 @@ export class KeyboardAndMouse3D {
     return out.set(0, 0.115, -0.05).applyMatrix4(this.mouseShape.matrixWorld);
   }
 
+  /** 键盘总灯光开关：true = 全部熄灭（RGB 灯层 + 按键按下的发光） */
+  public setLightsOff(off: boolean): void {
+    this.lightsOff = off;
+    if (off) {
+      for (const k of this.keys.values()) k.glow = 0;
+      if (this.rgbPlane) this.rgbPlane.visible = false;
+    }
+  }
+
   public setRgb(opts: Partial<{ mode: number; color: string; bright: number; speed: number }>): void {
     if (opts.mode !== undefined) this.rgbState.mode = opts.mode;
     if (opts.color) {
@@ -1223,9 +1242,9 @@ export class KeyboardAndMouse3D {
     deskHopY: number,
     privacyAlpha: number,
   ): void {
-    // RGB 灯层动画：模式 0 = 关闭
+    // RGB 灯层动画：模式 0 = 关闭；总开关关闭时整层不渲染
     if (this.rgbPlane) {
-      const on = this.rgbState.mode > 0 && this.rgbState.bright > 0.01;
+      const on = !this.lightsOff && this.rgbState.mode > 0 && this.rgbState.bright > 0.01;
       this.rgbPlane.visible = on;
       if (on) {
         this.rgbTime += dt * this.rgbState.speed;
@@ -1254,7 +1273,7 @@ export class KeyboardAndMouse3D {
       for (const k of this.activeKeys) {
         const targetDepth = k.down ? 0.032 : 0;
         k.depth += (targetDepth - k.depth) * (k.down ? kDownDepth : kUpDepth);
-        k.glow += ((k.down ? 1 : 0) - k.glow) * (k.down ? kDownGlow : kUpGlow);
+        k.glow += this.lightsOff ? -k.glow : ((k.down ? 1 : 0) - k.glow) * (k.down ? kDownGlow : kUpGlow);
 
         const settled = !k.down && k.depth < 0.00025 && k.glow < 0.002;
         if (settled) {

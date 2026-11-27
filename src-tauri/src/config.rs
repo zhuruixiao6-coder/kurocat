@@ -11,8 +11,9 @@ fn default_idle_play() -> bool { true }
 fn default_idle_play_sec() -> u32 { 30 }
 fn default_kb_rgb_mode() -> u8 { 1 }
 fn default_kb_rgb_color() -> String { "#22e0e6".to_string() }
-fn default_kb_rgb_bright() -> f32 { 1.0 }
+fn default_kb_rgb_bright() -> f32 { 1.15 }
 fn default_kb_rgb_speed() -> f32 { 1.0 }
+fn default_kb_lights_off() -> bool { false }
 
 fn default_mcp_enabled() -> bool {
     true
@@ -229,6 +230,8 @@ pub struct AppSettings {
     pub kb_rgb_bright: f32,
     #[serde(default = "default_kb_rgb_speed")]
     pub kb_rgb_speed: f32,
+    #[serde(default = "default_kb_lights_off")]
+    pub kb_lights_off: bool,
     #[serde(default = "default_privacy_password_guard")]
     pub privacy_password_guard: bool,
     #[serde(default = "default_tail_key_mode")]
@@ -280,6 +283,7 @@ impl Default for AppSettings {
             kb_rgb_color: default_kb_rgb_color(),
             kb_rgb_bright: default_kb_rgb_bright(),
             kb_rgb_speed: default_kb_rgb_speed(),
+            kb_lights_off: default_kb_lights_off(),
             privacy_password_guard: default_privacy_password_guard(),
             tail_key_mode: default_tail_key_mode(),
             tail_key_ids: default_tail_key_ids(),

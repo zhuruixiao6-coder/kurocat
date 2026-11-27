@@ -1898,6 +1898,10 @@ export class KuroCatEngine3D {
     this.desk.setRgb({ mode, color, bright, speed });
   }
 
+  public setKeyboardLightsOff(off: boolean): void {
+    this.desk.setLightsOff(off);
+  }
+
   public setGameActive(active: boolean): void {
     this.gameActive = Boolean(active);
   }

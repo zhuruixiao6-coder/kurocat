@@ -36,6 +36,7 @@ interface AppSettings {
   kbRgbMode?: number;
   kbRgbBright?: number;
   kbRgbSpeed?: number;
+  kbLightsOff?: boolean;
   keyboardOrientation: KeyboardOrientation;
   privacyPasswordGuard: boolean;
   tailKeyMode: TailKeyMode;
@@ -100,8 +101,9 @@ let settings: AppSettings = {
   keyboardLayout: '65',
   keyboardPreset: '',
   kbRgbMode: 1,
-  kbRgbBright: 1,
+  kbRgbBright: 1.15,
   kbRgbSpeed: 1,
+  kbLightsOff: false,
   keyboardOrientation: 'cat',
   privacyPasswordGuard: true,
   tailKeyMode: 'smart',
@@ -980,6 +982,8 @@ function syncUI(): void {
   setCheck('chk-bubbles', settings.showKeyBubbles);
   setCheck('chk-idle-play', settings.idlePlay !== false);
   {
+    const lightsEl = document.getElementById('kb-lights');
+    if (lightsEl) lightsEl.textContent = settings.kbLightsOff === false ? '✓' : '○';
     const modeNames = ['关闭', '渐变', '呼吸', '流光'];
     const rgbMode = settings.kbRgbMode ?? 1;
     const mEl = document.getElementById('kb-rgb-mode');
@@ -1498,6 +1502,9 @@ async function bootstrap(): Promise<void> {
         break;
       case 'toggle-bubbles':
         void applySettingsPatch({ showKeyBubbles: !settings.showKeyBubbles });
+        break;
+      case 'toggle-kb-lights':
+        void applySettingsPatch({ kbLightsOff: settings.kbLightsOff === false });
         break;
       case 'cycle-kb-rgb-mode': {
         const next = ((settings.kbRgbMode ?? 1) + 1) % 4;
