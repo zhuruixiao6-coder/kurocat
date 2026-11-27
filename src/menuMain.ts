@@ -138,6 +138,7 @@ const tabBodyEl = document.getElementById('menu-tab-body') as HTMLDivElement | n
 const breedPillsEl = document.getElementById('breed-pills') as HTMLDivElement;
 const scaleSliderEl = document.getElementById('scale-slider') as HTMLInputElement;
 const kbRgbSliderEl = document.getElementById('kb-rgb-slider') as HTMLInputElement | null;
+const kbColorInputEl = document.getElementById('kb-color-input') as HTMLInputElement | null;
 const scaleValueEl = document.getElementById('scale-value') as HTMLButtonElement;
 const tailModeBadgeEl = document.getElementById('tail-mode-badge') as HTMLSpanElement;
 const tailKeysCountEl = document.getElementById('tail-keys-count') as HTMLSpanElement;
@@ -1006,6 +1007,9 @@ function syncUI(): void {
       if (eb) { eb.textContent = `● ${cb2}`; eb.style.color = cb2; }
       const ec = document.getElementById('kb-color-c');
       if (ec) { ec.textContent = `● ${cc}`; ec.style.color = cc; }
+      const sw = document.getElementById('kb-color-swatch');
+      if (sw) { sw.textContent = `● ${ca}`; sw.style.color = ca; }
+      if (kbColorInputEl && kbColorInputEl.value.toLowerCase() !== ca.toLowerCase()) kbColorInputEl.value = ca;
       const pv = document.getElementById('kb-color-preview');
       if (pv) {
         pv.style.background = mode === 1
@@ -1022,7 +1026,26 @@ function syncUI(): void {
     const mEl = document.getElementById('kb-rgb-mode');
     if (mEl) mEl.textContent = `${rgbMode > 0 ? '✓' : '○'} ${modeNames[rgbMode] ?? '渐变'}`;
     const brightPct = Math.round((settings.kbRgbBright ?? 1) * 100);
-    if (kbRgbSliderEl) {
+    if (kbColorInputEl) {
+    let colorTimer: number | undefined;
+    const applyColor = () => {
+      const v = kbColorInputEl.value;
+      const sw = document.getElementById('kb-color-swatch');
+      if (sw) { sw.textContent = `● ${v}`; sw.style.color = v; }
+      const pv = document.getElementById('kb-color-preview');
+      if (pv) pv.style.background = `linear-gradient(90deg, ${v}, ${v})`;
+      const hint = document.getElementById('kb-color-hint');
+      if (hint) hint.textContent = `纯色 ${v}`;
+      if (colorTimer) window.clearTimeout(colorTimer);
+      colorTimer = window.setTimeout(() => {
+        void applySettingsPatch({ kbColorA: v, kbColorMode: 1 });
+      }, 60);
+    };
+    kbColorInputEl.addEventListener('input', applyColor);
+    kbColorInputEl.addEventListener('change', applyColor);
+  }
+
+  if (kbRgbSliderEl) {
       kbRgbSliderEl.value = String(brightPct);
       kbRgbSliderEl.style.setProperty('--pct', `${Math.min(100, (brightPct / 150) * 100).toFixed(1)}%`);
     }
@@ -1541,6 +1564,12 @@ async function bootstrap(): Promise<void> {
         break;
       case 'toggle-bubbles':
         void applySettingsPatch({ showKeyBubbles: !settings.showKeyBubbles });
+        break;
+      case 'pick-light-color':
+        if (kbColorInputEl) {
+          kbColorInputEl.value = settings.kbColorA ?? '#22e0e6';
+          kbColorInputEl.click();
+        }
         break;
       case 'cycle-kb-color-mode':
         void applySettingsPatch({ kbColorMode: ((settings.kbColorMode ?? 0) + 1) % 3 });

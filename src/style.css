@@ -166,8 +166,20 @@ html.win7-ulw-mode #collar-row {
 .menu-check {
   color: #c8f538;
   font-weight: 700;
-  width: 14px;
-  text-align: center;
+  min-width: 14px;
+  width: auto;
+  white-space: nowrap;   /* 值文字（如 "✓ 渐变"）保持横向，不逐字换行 */
+  flex: 0 0 auto;
+  text-align: right;
+}
+
+/* 左侧标签可压缩，右侧值不被挤成竖排 */
+.menu-item > span:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .menu-sep {
