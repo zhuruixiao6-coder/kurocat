@@ -160,7 +160,7 @@ let settings: AppSettings = {
   keySoundStyle: 'mechanical',
   autostart: false,
   catBreed: 'black',
-  mcpEnabled: true,
+  mcpEnabled: false,
   mcpPort: 27420,
   keyboardLayout: '65',
   keyboardPreset: '',

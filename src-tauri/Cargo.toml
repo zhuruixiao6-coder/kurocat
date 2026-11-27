@@ -1,9 +1,12 @@
 [package]
 name = "kuro-cat-pet"
-version = "5.9.14"
-description = "Cross-platform desktop cat typing & mouse companion for Windows and macOS"
-authors = ["Kevin Hao"]
+version = "5.9.15"
+description = "KuroCat desktop pet - a typing cat companion (keyboard visualizer, accessories, custom skins)"
+authors = ["zhuruixiao6-coder"]
 edition = "2021"
+license = "MIT"
+repository = "https://github.com/zhuruixiao6-coder/kurocat"
+homepage = "https://github.com/zhuruixiao6-coder/kurocat"
 
 [lib]
 name = "kuro_cat_pet_lib"

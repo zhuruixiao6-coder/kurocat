@@ -92,7 +92,7 @@ let settings: AppSettings = {
   soundEnabled: true,
   autostart: false,
   catBreed: 'black',
-  mcpEnabled: true,
+  mcpEnabled: false,
   mcpPort: 27420,
   keyboardLayout: '65',
   keyboardPreset: '',
@@ -1529,9 +1529,20 @@ async function bootstrap(): Promise<void> {
           closeMenu();
         }
         break;
-      case 'toggle-mcp':
-        void applySettingsPatch({ mcpEnabled: !settings.mcpEnabled });
+      case 'toggle-mcp': {
+        if (settings.mcpEnabled) {
+          void applySettingsPatch({ mcpEnabled: false });
+          break;
+        }
+        // 启用前明确告知：会在本机 127.0.0.1 上开一个端口给 AI 客户端用
+        const ok = window.confirm(
+          `开启 MCP 服务会在本机 127.0.0.1:${settings.mcpPort} 上监听一个本地端口，\n` +
+            '供 Claude / Cursor 等 AI 客户端调用（仅本机可访问，不对外网开放）。\n\n' +
+            '确定开启吗？',
+        );
+        if (ok) void applySettingsPatch({ mcpEnabled: true });
         break;
+      }
       case 'copy-mcp':
         void copyMcpConfig();
         break;
