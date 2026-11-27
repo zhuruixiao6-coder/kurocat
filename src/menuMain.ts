@@ -100,8 +100,8 @@ let settings: AppSettings = {
   keyboardLayout: '65',
   keyboardPreset: '',
   kbRgbMode: 1,
-  kbRgbBright: -1,
-  kbRgbSpeed: 0,
+  kbRgbBright: 1,
+  kbRgbSpeed: 1,
   keyboardOrientation: 'cat',
   privacyPasswordGuard: true,
   tailKeyMode: 'smart',
@@ -984,16 +984,16 @@ function syncUI(): void {
     const rgbMode = settings.kbRgbMode ?? 1;
     const mEl = document.getElementById('kb-rgb-mode');
     if (mEl) mEl.textContent = `${rgbMode > 0 ? '✓' : '○'} ${modeNames[rgbMode] ?? '渐变'}`;
-    const brightPct = Math.round(((settings.kbRgbBright ?? -1) < 0 ? 0.85 : (settings.kbRgbBright as number)) * 100);
+    const brightPct = Math.round((settings.kbRgbBright ?? 1) * 100);
     if (kbRgbSliderEl) {
       kbRgbSliderEl.value = String(brightPct);
       kbRgbSliderEl.style.setProperty('--pct', `${Math.min(100, (brightPct / 150) * 100).toFixed(1)}%`);
     }
     const bv = document.getElementById('kb-rgb-value');
     if (bv) bv.textContent = `${brightPct}%`;
-    const spd = settings.kbRgbSpeed ?? 0;
+    const spd = settings.kbRgbSpeed ?? 1;
     const spEl = document.getElementById('kb-rgb-speed');
-    if (spEl) spEl.textContent = spd <= 0 ? '○ 默认' : `✓ ${spd < 0.7 ? '慢' : spd > 1.4 ? '快' : '正常'}`;
+    if (spEl) spEl.textContent = `✓ ${spd < 0.7 ? '慢' : spd > 1.4 ? '快' : '正常'}`;
     const thEl = document.getElementById('val-idle-threshold');
     if (thEl) {
       const sec = settings.idlePlaySec ?? 30;
@@ -1505,8 +1505,8 @@ async function bootstrap(): Promise<void> {
         break;
       }
       case 'cycle-kb-rgb-speed': {
-        const steps = [0, 0.45, 1, 1.9];
-        const cur = settings.kbRgbSpeed ?? 0;
+        const steps = [0.45, 1, 1.9];
+        const cur = settings.kbRgbSpeed ?? 1;
         const next = steps[(steps.indexOf(cur) + 1) % steps.length] ?? 0;
         void applySettingsPatch({ kbRgbSpeed: next });
         break;
@@ -1548,6 +1548,9 @@ async function bootstrap(): Promise<void> {
         void invoke('preview_key_sound', {
           style: normalizeKeySoundStyle(settings.keySoundStyle),
         }).catch(() => {});
+        break;
+      case 'open-skin-folder':
+        void invoke('open_skin_folder');
         break;
       case 'open-keyboard-folder':
         void invoke('open_keyboard_folder')

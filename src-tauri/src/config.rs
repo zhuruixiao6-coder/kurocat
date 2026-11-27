@@ -7,6 +7,13 @@ fn default_cat_breed() -> String {
     "black".to_string()
 }
 
+fn default_idle_play() -> bool { true }
+fn default_idle_play_sec() -> u32 { 30 }
+fn default_kb_rgb_mode() -> u8 { 1 }
+fn default_kb_rgb_color() -> String { "#22e0e6".to_string() }
+fn default_kb_rgb_bright() -> f32 { 1.0 }
+fn default_kb_rgb_speed() -> f32 { 1.0 }
+
 fn default_mcp_enabled() -> bool {
     true
 }
@@ -210,6 +217,18 @@ pub struct AppSettings {
     pub keyboard_orientation: String,
     #[serde(default)]
     pub keyboard_preset: String,
+    #[serde(default = "default_idle_play")]
+    pub idle_play: bool,
+    #[serde(default = "default_idle_play_sec")]
+    pub idle_play_sec: u32,
+    #[serde(default = "default_kb_rgb_mode")]
+    pub kb_rgb_mode: u8,
+    #[serde(default = "default_kb_rgb_color")]
+    pub kb_rgb_color: String,
+    #[serde(default = "default_kb_rgb_bright")]
+    pub kb_rgb_bright: f32,
+    #[serde(default = "default_kb_rgb_speed")]
+    pub kb_rgb_speed: f32,
     #[serde(default = "default_privacy_password_guard")]
     pub privacy_password_guard: bool,
     #[serde(default = "default_tail_key_mode")]
@@ -255,6 +274,12 @@ impl Default for AppSettings {
             keyboard_layout: default_keyboard_layout(),
             keyboard_orientation: default_keyboard_orientation(),
             keyboard_preset: String::new(),
+            idle_play: default_idle_play(),
+            idle_play_sec: default_idle_play_sec(),
+            kb_rgb_mode: default_kb_rgb_mode(),
+            kb_rgb_color: default_kb_rgb_color(),
+            kb_rgb_bright: default_kb_rgb_bright(),
+            kb_rgb_speed: default_kb_rgb_speed(),
             privacy_password_guard: default_privacy_password_guard(),
             tail_key_mode: default_tail_key_mode(),
             tail_key_ids: default_tail_key_ids(),

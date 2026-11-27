@@ -170,8 +170,8 @@ let settings: AppSettings = {
   keyboardPreset: '',
   kbRgbMode: 1,
   kbRgbColor: '#22e0e6',
-  kbRgbBright: -1,
-  kbRgbSpeed: 0,
+  kbRgbBright: 1,
+  kbRgbSpeed: 1,
   keyboardOrientation: 'cat',
   privacyPasswordGuard: true,
   tailKeyMode: 'smart',
@@ -419,13 +419,13 @@ function syncEngine3DState(): void {
   engine3d.setTailKeyConfig(tailMode, tailIds);
   const idleSec = settings.idlePlaySec ?? 30;
   engine3d.setIdlePlay(settings.idlePlay !== false && idleSec > 0, idleSec > 0 ? idleSec : 30);
-  const rgbBright = settings.kbRgbBright ?? -1;
-  const rgbSpeed = settings.kbRgbSpeed ?? 0;
+  const rgbBright = settings.kbRgbBright ?? 1;
+  const rgbSpeed = settings.kbRgbSpeed ?? 1;
   engine3d.setKeyboardRgb(
     settings.kbRgbMode ?? 1,
     settings.kbRgbColor ?? '#22e0e6',
-    rgbBright < 0 ? 0.85 : rgbBright,
-    rgbSpeed <= 0 ? 1 : rgbSpeed,
+    rgbBright,
+    rgbSpeed,
   );
   engine3d.setPrivacyMode(privacyActive);
   engine3d.resize();
@@ -1244,13 +1244,13 @@ async function bootstrap(): Promise<void> {
     {
       const sec = settings.idlePlaySec ?? 30;
       engine3d?.setIdlePlay(settings.idlePlay !== false && sec > 0, sec > 0 ? sec : 30);
-      const br = settings.kbRgbBright ?? -1;
-      const sp = settings.kbRgbSpeed ?? 0;
+      const br = settings.kbRgbBright ?? 1;
+      const sp = settings.kbRgbSpeed ?? 1;
       engine3d?.setKeyboardRgb(
         settings.kbRgbMode ?? 1,
         settings.kbRgbColor ?? '#22e0e6',
-        br < 0 ? 0.85 : br,
-        sp <= 0 ? 1 : sp,
+        br,
+        sp,
       );
     }
     syncMenuUI();

@@ -968,6 +968,27 @@ fn list_keyboard_presets() -> Vec<serde_json::Value> {
 }
 
 #[tauri::command]
+fn open_skin_folder() -> Result<(), String> {
+    let dir = crate::config::app_data_dir().join("skins");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    #[cfg(windows)]
+    {
+        std::process::Command::new("explorer")
+            .arg(&dir)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("/usr/bin/open")
+            .arg(&dir)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 fn open_keyboard_folder() -> Result<(), String> {
     let dir = crate::config::app_data_dir().join("keyboards");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -2746,6 +2767,7 @@ pub fn run() {
             restart_app,
             list_keyboard_presets,
             open_keyboard_folder,
+            open_skin_folder,
             update_settings,
             open_context_menu,
             close_context_menu,

@@ -944,8 +944,10 @@ export class KeyboardAndMouse3D {
             col = hsv2rgb(vec3(hue, 0.95, 1.0));
             g = 0.14 + 0.86 * sweep;
           }
-          // 与主色轻微混合，让自定义颜色能"染色"，但默认仍是全彩
-          col = mix(col, uColA, 0.12);
+          // 各模式亮度归一：统一压到 0.62~1.0，切换模式不再出现"变暗"
+          g = 0.62 + 0.38 * clamp(g, 0.0, 1.0);
+          // 只留 4% 主色染色，避免高饱和彩虹被冲淡
+          col = mix(col, uColA, 0.04);
           gl_FragColor = vec4(col * g * uBright, g * uBright * 0.88);
         }
       `,
