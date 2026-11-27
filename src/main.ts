@@ -1249,6 +1249,9 @@ async function bootstrap(): Promise<void> {
     }
   });
 
+  await listen('kuro-gentle-demo', () => {
+    engine3d?.playGentleSequence();
+  });
   await listen('kuro-open-tail-picker', () => {
     void openTailPicker();
   });

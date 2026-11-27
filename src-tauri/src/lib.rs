@@ -662,6 +662,13 @@ fn close_context_menu(app: AppHandle) {
 }
 
 #[tauri::command]
+fn trigger_gentle_demo(app: AppHandle) {
+    close_context_menu(app.clone());
+    set_pet_visible(&app, true);
+    let _ = app.emit("kuro-gentle-demo", ());
+}
+
+#[tauri::command]
 fn open_tail_picker_from_menu(app: AppHandle) {
     close_context_menu(app.clone());
     set_pet_visible(&app, true);
@@ -2743,6 +2750,7 @@ pub fn run() {
             open_context_menu,
             close_context_menu,
             open_tail_picker_from_menu,
+            trigger_gentle_demo,
             preview_scale,
             preview_key_sound,
             get_profile,

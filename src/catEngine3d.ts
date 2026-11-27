@@ -75,7 +75,7 @@ interface Fx3D {
   baseX: number;
 }
 
-type PlayKind3D = 'tailChase' | 'pounce' | 'swat' | 'circle' | 'stretch' | 'yawn';
+type PlayKind3D = 'tailChase' | 'pounce' | 'swat' | 'circle' | 'stretch' | 'yawn' | 'groom' | 'bunt' | 'softBlink';
 
 interface IdleAct3D {
   kind: 'tilt' | 'ear' | 'slowBlink' | 'look' | 'tail';
@@ -779,6 +779,8 @@ export class KuroCatEngine3D {
   private playAct: { kind: PlayKind3D; t0: number; dur: number } | null = null;
   private playNextAt = 0;
   private playHistory: PlayKind3D[] = [];
+  private gentleQueue: PlayKind3D[] = [];
+  private gentleDemo = false;
   private playLean = 0;
   private playSquash = 0;
   private playHeadPitch = 0;
@@ -2108,6 +2110,18 @@ export class KuroCatEngine3D {
   }
 
   /** 空闲自动玩耍：启用/阈值（秒）。不接触任何输入钩子，只读 lastInput。 */
+  /** 行为展示：舔爪理毛 → 蹭头 → 缓慢眨眼（温柔三连，任意输入即中止） */
+  public playGentleSequence(): void {
+    this.wake();
+    this.asleep = false;
+    this.playActive = true;
+    this.gentleDemo = true;
+    this.playAct = null;
+    this.gentleQueue = ['groom', 'bunt', 'softBlink'];
+    this.playNextAt = this.elapsed + 0.35;
+    this.playHistory = [];
+  }
+
   public setIdlePlay(enabled: boolean, thresholdSec: number): void {
     this.playEnabled = enabled;
     this.playThreshold = Math.max(5, Math.min(1800, thresholdSec || 30));
@@ -2116,6 +2130,8 @@ export class KuroCatEngine3D {
 
   private stopIdlePlay(): void {
     this.playActive = false;
+    this.gentleDemo = false;
+    this.gentleQueue = [];
     this.playAct = null;
     this.playNextAt = 0;
     this.playLean = 0;
@@ -2135,7 +2151,9 @@ export class KuroCatEngine3D {
     void dt;
     const idle = t - this.lastInput;
     const canPlay =
-      this.playEnabled && !this.asleep && !this.privacyMode && idle >= this.playThreshold;
+      !this.asleep &&
+      !this.privacyMode &&
+      (this.gentleDemo || (this.playEnabled && idle >= this.playThreshold));
 
     if (!canPlay) {
       if (this.playActive) this.stopIdlePlay();
@@ -2145,23 +2163,33 @@ export class KuroCatEngine3D {
       this.playActive = true;
       this.playNextAt = t + 0.6;
     }
-    if (!this.playAct && t >= this.playNextAt) this.startPlayAct(t);
+    if (!this.playAct && t >= this.playNextAt) {
+      const queued = this.gentleQueue.shift();
+      if (queued) this.startPlayAct(t, queued);
+      else this.startPlayAct(t);
+    }
     if (this.playAct) {
       const a = this.playAct;
       const k = clamp((t - a.t0) / a.dur, 0, 1);
       this.applyPlayPose(a.kind, k);
       if (k >= 1) {
         this.playAct = null;
-        this.playNextAt = t + 0.9 + Math.random() * 0.7;
+        if (this.gentleDemo && this.gentleQueue.length === 0) {
+          // 三连收尾：留一点余韵再回到静止，避免突然定格
+          this.gentleDemo = false;
+          this.playActive = false;
+        } else {
+          this.playNextAt = t + (this.gentleDemo ? 0.55 : 0.9 + Math.random() * 0.7);
+        }
       }
     }
   }
 
-  private startPlayAct(t: number): void {
+  private startPlayAct(t: number, forced?: PlayKind3D): void {
     const all: PlayKind3D[] = ['tailChase', 'pounce', 'swat', 'circle', 'stretch', 'yawn'];
     // 最近两次不重复，避免短时间内来回同一套
     const pool = all.filter((k) => !this.playHistory.includes(k));
-    const kind = (pool.length ? pool : all)[Math.floor(Math.random() * (pool.length || all.length))];
+    const kind = forced ?? (pool.length ? pool : all)[Math.floor(Math.random() * (pool.length || all.length))];
     this.playHistory.push(kind);
     if (this.playHistory.length > 2) this.playHistory.shift();
     const dur: Record<PlayKind3D, number> = {
@@ -2171,6 +2199,9 @@ export class KuroCatEngine3D {
       circle: 4.2,
       stretch: 3.4,
       yawn: 3.6,
+      groom: 4.6,
+      bunt: 2.8,
+      softBlink: 2.4,
     };
     this.playAct = { kind, t0: t, dur: dur[kind] };
     this.playLean = 0;
@@ -2376,6 +2407,82 @@ export class KuroCatEngine3D {
           const c = (k - 0.82) / 0.18;
           this.playSquint = 0.35 * Math.sin(c * Math.PI); // 舔一下嘴
           this.playHeadPitch = -0.04 * (1 - c);
+        }
+        break;
+      }
+      case 'groom': {
+        // 舔爪理毛：抬右爪到嘴边 → 低头舔三下 → 放爪收尾
+        if (k < 0.18) {
+          const c = easeOut(k / 0.18);
+          this.playArmR = 0.32 * c;
+          this.playHeadPitch = 0.20 * c;
+          this.playHeadYaw = -0.14 * c;
+          this.playLean = 0.04 * c;
+          this.playTailWag = 0.3 * c;
+        } else if (k < 0.74) {
+          const c = (k - 0.18) / 0.56;
+          const lick = Math.sin(c * Math.PI * 6);       // 三下舔舐
+          this.playArmR = 0.32 + 0.02 * Math.abs(lick);
+          this.playHeadPitch = 0.20 + 0.05 * lick;
+          this.playHeadYaw = -0.14 - 0.03 * lick;
+          this.playSquint = 0.55 + 0.25 * Math.max(0, lick);
+          this.playLean = 0.04;
+          this.playTailWag = 0.35 + 0.15 * Math.abs(lick);
+        } else {
+          const c = (k - 0.74) / 0.26;
+          this.playArmR = 0.32 * (1 - easeOut(c));
+          this.playHeadPitch = 0.20 * (1 - c);
+          this.playHeadYaw = -0.14 * (1 - c);
+          this.playSquint = 0.55 * (1 - c);
+          this.playLean = 0.04 * (1 - c);
+          this.playTailWag = 0.35 * (1 - c);
+        }
+        break;
+      }
+      case 'bunt': {
+        // 蹭头：先低头靠近 → 左右蹭两下 → 慢慢退回
+        if (k < 0.22) {
+          const c = easeOut(k / 0.22);
+          this.playLean = 0.18 * c;
+          this.playHeadPitch = 0.16 * c;
+          this.playSquash = 0.03 * c;
+          this.playTailWag = 0.4 * c;
+        } else if (k < 0.66) {
+          const c = (k - 0.22) / 0.44;
+          const rub = Math.sin(c * Math.PI * 2);
+          this.playLean = 0.18 + 0.05 * rub;
+          this.playHeadPitch = 0.16 + 0.04 * Math.abs(rub);
+          this.playHeadYaw = 0.36 * rub;
+          this.playTwist = 0.10 * rub;
+          this.playSquash = 0.03;
+          this.playSquint = 0.45 * Math.abs(rub);
+          this.playTailWag = 0.5;
+        } else {
+          const c = (k - 0.66) / 0.34;
+          this.playLean = 0.18 * (1 - easeOut(c));
+          this.playHeadPitch = 0.16 * (1 - c);
+          this.playHeadYaw = 0.30 * Math.sin((1 - c) * Math.PI) * 0.4;
+          this.playSquint = 0.45 * (1 - c);
+          this.playTailWag = 0.5 * (1 - c);
+        }
+        break;
+      }
+      case 'softBlink': {
+        // 缓慢眨眼：慢慢闭 → 停一拍 → 慢慢睁
+        if (k < 0.34) {
+          const c = easeInOut(k / 0.34);
+          this.playSquint = 1.0 * c;
+          this.playHeadPitch = 0.05 * c;
+          this.playTailWag = 0.25 * c;
+        } else if (k < 0.56) {
+          this.playSquint = 1.0;
+          this.playHeadPitch = 0.05;
+          this.playTailWag = 0.25;
+        } else {
+          const c = easeInOut((k - 0.56) / 0.44);
+          this.playSquint = 1.0 * (1 - c);
+          this.playHeadPitch = 0.05 * (1 - c);
+          this.playTailWag = 0.25 * (1 - c);
         }
         break;
       }

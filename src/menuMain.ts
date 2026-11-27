@@ -1452,6 +1452,9 @@ async function bootstrap(): Promise<void> {
       case 'toggle-bubbles':
         void applySettingsPatch({ showKeyBubbles: !settings.showKeyBubbles });
         break;
+      case 'gentle-demo':
+        void invoke('trigger_gentle_demo');
+        break;
       case 'toggle-idle-play':
         void applySettingsPatch({ idlePlay: settings.idlePlay === false });
         break;
