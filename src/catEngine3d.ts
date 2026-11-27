@@ -773,6 +773,7 @@ export class KuroCatEngine3D {
   private playTailWag = 0;
   private playSquint = 0;
   private playYaw = 0;
+  private playTwist = 0;
   private playLift = 0;
   private playArmL = 0;
   private playArmR = 0;
@@ -2108,8 +2109,6 @@ export class KuroCatEngine3D {
         this.playNextAt = t + 0.9 + Math.random() * 0.7;
       }
     }
-    this.catRoot.rotation.y = this.playYaw;
-    this.catRoot.position.set(this.homePos.x, this.homePos.y + this.playLift, this.homePos.z);
   }
 
   private startPlayAct(t: number): void {
@@ -2135,6 +2134,7 @@ export class KuroCatEngine3D {
     this.playTailWag = 0;
     this.playSquint = 0;
     this.playYaw = 0;
+    this.playTwist = 0;
     this.playLift = 0;
   }
 
@@ -2155,8 +2155,11 @@ export class KuroCatEngine3D {
 
     switch (kind) {
       case 'tailChase': {
-        // 原地转一圈追尾巴：身体跟着转、头看向尾巴、尾巴甩得快
-        this.playYaw = ease(k) * Math.PI * 2;
+        // 追尾巴：不转整个模型，靠脊柱/胸腔左右扭 + 头回望 + 碎步
+        this.playTwist = Math.sin(k * Math.PI * 2) * 0.55;
+        this.playYaw = 0;
+        this.playHeadYaw += this.playTwist * 0.75;
+        this.playLean += this.playTwist * 0.10;
         this.playTailWag = 2.4 * bell;
         this.playHeadYaw = -0.34 * Math.sin(k * Math.PI * 2);
         this.playLean = 0.05 * Math.sin(k * Math.PI * 2);
@@ -2178,7 +2181,8 @@ export class KuroCatEngine3D {
           this.playArmR = -0.02 * c;
         } else {
           const j = (k - 0.36) / 0.64;
-          this.playLift = 0.24 * Math.sin(Math.PI * Math.min(1, j * 1.15));
+          this.playLift = 0;
+          this.playSquash = -0.07 * Math.sin(Math.PI * j);
           this.playSquash = -0.05 * Math.sin(Math.PI * j);
           this.playLean = 0.16 * Math.sin(Math.PI * j);
           this.playHeadPitch = -0.08 * Math.sin(Math.PI * j);
@@ -2203,8 +2207,11 @@ export class KuroCatEngine3D {
         break;
       }
       case 'circle': {
-        // 慢慢绕半圈，身体侧倾
-        this.playYaw = ease(k) * Math.PI * 1.1;
+        // 绕圈：脊柱左右摆 + 交替迈步，根节点保持不动
+        this.playTwist = Math.sin(k * Math.PI * 2) * 0.42;
+        this.playYaw = 0;
+        this.playHeadYaw += this.playTwist * 0.6;
+        this.playLean += this.playTwist * 0.16;
         this.playLean = 0.07 * Math.sin(k * Math.PI * 2);
         this.playHeadYaw = -0.12 * Math.sin(k * Math.PI * 2);
         this.playTailWag = 0.9 * bell;
