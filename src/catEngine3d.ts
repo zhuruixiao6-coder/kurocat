@@ -2165,12 +2165,12 @@ export class KuroCatEngine3D {
     this.playHistory.push(kind);
     if (this.playHistory.length > 2) this.playHistory.shift();
     const dur: Record<PlayKind3D, number> = {
-      tailChase: 2.6,
-      pounce: 2.2,
-      swat: 1.9,
-      circle: 3.4,
-      stretch: 2.8,
-      yawn: 3.0,
+      tailChase: 3.2,
+      pounce: 3.0,
+      swat: 2.2,
+      circle: 4.2,
+      stretch: 3.4,
+      yawn: 3.6,
     };
     this.playAct = { kind, t0: t, dur: dur[kind] };
     this.playLean = 0;
@@ -2184,10 +2184,21 @@ export class KuroCatEngine3D {
     this.playLift = 0;
   }
 
-  /** 各动作的姿态曲线：0..1 的时间片 → 身体倾斜/挤压/头部/尾巴参数 */
+  /**
+   * 各动作的姿态曲线（0..1 时间片 → 部位参数）
+   * 编舞原则：预备(anticipation) → 主动作(action) → 落地缓冲(follow-through) → 短暂停顿
+   * 尾巴始终做反向配重；四肢与脊柱错峰发力，避免整体一起动。
+   */
   private applyPlayPose(kind: PlayKind3D, k: number): void {
-    const ease = (x: number) => (x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2);
-    const bell = Math.sin(Math.PI * k);
+    const easeOut = (x: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3);
+    const easeInOut = (x: number) => (x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2);
+    // 一段"起-停-落"的包络：a 起、b 收，两端羽化
+    const pulse = (x: number, a: number, b: number) => {
+      const up = Math.min(1, Math.max(0, (x - a) / 0.10));
+      const down = Math.min(1, Math.max(0, (b - x) / 0.14));
+      return Math.min(up, down);
+    };
+
     this.playLean = 0;
     this.playSquash = 0;
     this.playHeadPitch = 0;
@@ -2198,97 +2209,174 @@ export class KuroCatEngine3D {
     this.playArmR = 0;
     this.playReach = 0;
     this.playSwing = 0;
+    this.playTwist = 0;
 
     switch (kind) {
       case 'tailChase': {
-        // 追尾巴：不转整个模型，靠脊柱/胸腔左右扭 + 头回望 + 碎步
-        this.playTwist = Math.sin(k * Math.PI * 2) * 0.55;
-        this.playYaw = 0;
-        this.playHeadYaw += this.playTwist * 0.75;
-        this.playLean += this.playTwist * 0.10;
-        this.playTailWag = 2.4 * bell;
-        this.playHeadYaw = -0.34 * Math.sin(k * Math.PI * 2);
-        this.playLean = 0.05 * Math.sin(k * Math.PI * 2);
-        // 交替抬爪：左右反相，像追尾巴时的小碎步
-        const step = Math.sin(k * Math.PI * 4);
-        this.playArmL = 0.06 + 0.03 * step;
-        this.playArmR = 0.06 - 0.03 * step;
-        this.playSwing = 0.02 * step;
+        // 1) 先静止盯着尾巴看（0~0.18）→ 2) 突然回身去扑（0.18~0.55）→ 3) 追两步（0.55~0.8）→ 4) 停住（0.8~1）
+        if (k < 0.18) {
+          const c = k / 0.18;
+          this.playHeadYaw = -0.24 * easeOut(c);      // 头先转过去看尾巴
+          this.playTwist = -0.10 * easeOut(c);
+          this.playTailWag = 0.35 * c;                 // 尾巴被盯得抖一下
+        } else if (k < 0.55) {
+          const c = easeInOut((k - 0.18) / 0.37);
+          this.playTwist = -0.10 + c * 0.72;           // 脊柱带身体回身
+          this.playHeadYaw = -0.24 + c * 0.58;         // 头跟着甩过去
+          this.playLean = -0.05 + c * 0.12;            // 重心先压向内侧
+          this.playArmL = 0.02 + 0.05 * c;             // 前爪交替离地
+          this.playArmR = 0.02;
+          this.playTailWag = 1.2 * c;                  // 尾巴加速甩开
+        } else if (k < 0.82) {
+          const c = (k - 0.55) / 0.27;
+          this.playTwist = 0.62 - 0.5 * easeInOut(c);
+          this.playHeadYaw = 0.34 - 0.3 * easeInOut(c);
+          this.playLean = 0.07 - 0.10 * c;
+          this.playArmL = 0.07 - 0.05 * c;
+          this.playArmR = 0.02 + 0.04 * c;             // 换另一只爪
+          this.playTailWag = 1.2 - 0.9 * c;
+        } else {
+          const c = (k - 0.82) / 0.18;
+          this.playTwist = 0.12 * (1 - easeOut(c));
+          this.playHeadYaw = 0.04 * (1 - c);
+          this.playTailWag = 0.3 * (1 - c);
+        }
         break;
       }
       case 'pounce': {
-        // 先压低蓄力，再向前一跳
-        if (k < 0.36) {
-          const c = k / 0.36;
-          this.playSquash = 0.16 * c;
+        // 蹲伏(收爪、压臀) → 屁股小幅度左右晃(试探) → 定住 → 前扑 → 轻落回弹 → 停顿
+        if (k < 0.30) {
+          const c = easeOut(k / 0.30);
+          this.playSquash = 0.15 * c;
           this.playLean = 0.10 * c;
-          this.playHeadPitch = 0.10 * c;
+          this.playHeadPitch = 0.12 * c;
           this.playArmL = -0.02 * c;
           this.playArmR = -0.02 * c;
+          this.playTailWag = 0.5 * c;
+        } else if (k < 0.44) {
+          // 屁股左右微晃（真实猫扑前的试探），只有后半身动
+          const wig = Math.sin(((k - 0.30) / 0.14) * Math.PI * 6);
+          this.playSquash = 0.15;
+          this.playLean = 0.10 + 0.02 * wig;
+          this.playHeadPitch = 0.12;
+          this.playArmL = -0.02;
+          this.playArmR = -0.02;
+          this.playTailWag = 0.5 + 0.35 * Math.abs(wig);
+          this.playSwing = 0.012 * wig;
+        } else if (k < 0.62) {
+          // 前扑：前爪先出、身体跟着展开，尾巴向后甩做配重
+          const c = easeOut((k - 0.44) / 0.18);
+          this.playSquash = 0.15 - 0.22 * c;
+          this.playLean = 0.12 + 0.16 * c;
+          this.playHeadPitch = 0.12 - 0.22 * c;
+          this.playArmL = 0.10 * c;
+          this.playArmR = 0.10 * c;
+          this.playReach = 0.09 * c;
+          this.playTailWag = 0.85 + 0.6 * c;
+        } else if (k < 0.74) {
+          // 落地缓冲：先压再弹（两次衰减振荡）
+          const c = (k - 0.62) / 0.12;
+          const bounce = Math.sin(c * Math.PI * 2) * Math.exp(-c * 2.2);
+          this.playSquash = 0.10 * bounce;
+          this.playLean = 0.10 * (1 - c);
+          this.playHeadPitch = 0.05 * bounce;
+          this.playArmL = 0.05 * (1 - c);
+          this.playArmR = 0.05 * (1 - c);
+          this.playTailWag = 0.5 * (1 - c);
         } else {
-          const j = (k - 0.36) / 0.64;
-          this.playLift = 0;
-          this.playSquash = -0.07 * Math.sin(Math.PI * j);
-          this.playSquash = -0.05 * Math.sin(Math.PI * j);
-          this.playLean = 0.16 * Math.sin(Math.PI * j);
-          this.playHeadPitch = -0.08 * Math.sin(Math.PI * j);
-          this.playTailWag = 1.2 * Math.sin(Math.PI * j);
-          this.playReach = 0.06 * Math.sin(Math.PI * j);
-          this.playArmL = 0.05 * Math.sin(Math.PI * j);
-          this.playArmR = 0.05 * Math.sin(Math.PI * j);
+          // 停顿：留一点余摆，像真的在观察
+          const c = (k - 0.74) / 0.26;
+          this.playSquash = 0.02 * (1 - c);
+          this.playTailWag = 0.25 * (1 - c);
+          this.playHeadYaw = 0.06 * Math.sin(c * Math.PI);
         }
         break;
       }
       case 'swat': {
-        // 左右各拍一下
-        const s = Math.sin(k * Math.PI * 3);
-        this.playLean = 0.14 * s;
-        this.playHeadYaw = 0.16 * s;
-        this.playSquash = 0.05 * Math.abs(s);
-        this.playTailWag = 0.8 * Math.abs(s);
-        // 右爪抬起横扫，左爪撑地
-        this.playArmR = 0.12 * Math.abs(s);
-        this.playArmL = -0.01 * Math.abs(s);
-        this.playSwing = 0.05 * s;
+        // 抬爪(慢) → 停顿 → 快速拍一下 → 收爪回弹 → 舔爪安抚
+        if (k < 0.34) {
+          const c = easeOut(k / 0.34);
+          this.playArmR = 0.13 * c;
+          this.playLean = -0.05 * c;
+          this.playHeadYaw = 0.10 * c;
+          this.playTailWag = 0.4 * c;
+        } else if (k < 0.46) {
+          this.playArmR = 0.13;
+          this.playLean = -0.05;
+          this.playHeadYaw = 0.12;
+          this.playTailWag = 0.55;
+        } else if (k < 0.60) {
+          const c = (k - 0.46) / 0.14;
+          const s = Math.sin(c * Math.PI);
+          this.playArmR = 0.13 - 0.16 * s;
+          this.playSwing = 0.05 * s;
+          this.playLean = -0.05 + 0.16 * s;
+          this.playHeadYaw = 0.12 - 0.22 * s;
+          this.playTailWag = 0.55 + 0.5 * s;
+        } else {
+          const c = (k - 0.60) / 0.40;
+          this.playArmR = -0.03 * (1 - easeOut(c));
+          this.playLean = 0.11 * (1 - c);
+          this.playHeadYaw = -0.10 * (1 - c);
+          this.playSquint = 0.55 * pulse(c, 0.05, 0.85); // 拍完舔爪/眯眼
+          this.playTailWag = 0.35 * (1 - c);
+        }
         break;
       }
       case 'circle': {
-        // 绕圈：脊柱左右摆 + 交替迈步，根节点保持不动
-        this.playTwist = Math.sin(k * Math.PI * 2) * 0.42;
-        this.playYaw = 0;
-        this.playHeadYaw += this.playTwist * 0.6;
-        this.playLean += this.playTwist * 0.16;
-        this.playLean = 0.07 * Math.sin(k * Math.PI * 2);
-        this.playHeadYaw = -0.12 * Math.sin(k * Math.PI * 2);
-        this.playTailWag = 0.9 * bell;
-        // 迈步：左右腿交替，重心跟着侧移
-        const gait = Math.sin(k * Math.PI * 4);
-        this.playArmL = 0.03 + 0.025 * gait;
-        this.playArmR = 0.03 - 0.025 * gait;
-        this.playSwing = 0.03 * gait;
-        this.playLean += 0.05 * gait;
+        // 三步走：每步都有"抬-落-停"，头部先探路，尾巴反向配重
+        const stepLen = 0.26;
+        const phase = Math.min(2, Math.floor(k / stepLen));
+        const local = Math.min(1, (k - phase * stepLen) / stepLen);
+        const stepPulse = Math.sin(Math.min(1, local / 0.7) * Math.PI);
+        const dir = phase % 2 === 0 ? 1 : -1;
+        this.playTwist = dir * 0.18 * stepPulse + (k > 0.78 ? dir * 0.05 : 0);
+        this.playLean = dir * 0.06 * stepPulse;
+        this.playArmL = phase % 2 === 0 ? 0.055 * stepPulse : 0.015;
+        this.playArmR = phase % 2 === 0 ? 0.015 : 0.055 * stepPulse;
+        this.playHeadYaw = dir * 0.20 * (0.55 + 0.45 * stepPulse);
+        this.playHeadPitch = 0.05 * stepPulse;
+        this.playTailWag = 0.55 + 0.25 * stepPulse;
         break;
       }
       case 'stretch': {
-        // 前伸伸展 + 抬屁股
-        this.playLean = 0.42 * bell;
-        this.playSquash = -0.09 * bell;
-        this.playHeadPitch = 0.18 * bell;
-        this.playTailWag = 0.5 * bell;
-        // 前爪向前伸（伸展的主动作由手臂完成，身体只是跟着前倾）
-        this.playReach = 0.10 * bell;
-        this.playArmL = 0.07 * bell;
-        this.playArmR = 0.07 * bell;
+        // 前肢前伸、脊背下凹、臀部抬高，尾根上翘保持平衡；保持一会儿再慢慢收回
+        const rise = easeOut(Math.min(1, k / 0.34));
+        const fall = 1 - easeInOut(Math.max(0, (k - 0.70) / 0.30));
+        const amt = rise * fall;
+        this.playLean = 0.40 * amt;
+        this.playSquash = -0.085 * amt;
+        this.playHeadPitch = 0.20 * amt;
+        this.playReach = 0.11 * amt;
+        this.playArmL = 0.075 * amt;
+        this.playArmR = 0.075 * amt;
+        this.playTailWag = 0.45 * amt;
+        this.playSquint = 0.25 * amt;
         break;
       }
       case 'yawn': {
-        // 仰头打哈欠、眯眼、耳朵略后压
-        this.playHeadPitch = -0.26 * bell;
-        this.playSquint = 0.92 * bell;
-        this.playSquash = 0.06 * bell;
-        this.playTailWag = 0.35 * bell;
-        this.playArmL = 0.015 * bell;
-        this.playArmR = 0.015 * bell;
+        // 吸气(头抬+胸廓开) → 张大(眯眼) → 慢慢合上 → 舔嘴收尾
+        if (k < 0.30) {
+          const c = easeInOut(k / 0.30);
+          this.playHeadPitch = -0.16 * c;
+          this.playSquash = 0.03 * c;
+        } else if (k < 0.58) {
+          const c = easeInOut((k - 0.30) / 0.28);
+          this.playHeadPitch = -0.16 - 0.12 * c;
+          this.playSquint = 0.9 * c;
+          this.playSquash = 0.03 + 0.03 * c;
+          this.playTailWag = 0.25 * c;
+        } else if (k < 0.82) {
+          const c = (k - 0.58) / 0.24;
+          this.playHeadPitch = -0.28 * (1 - easeOut(c));
+          this.playSquint = 0.9 * (1 - c);
+          this.playSquash = 0.06 * (1 - c);
+          this.playTailWag = 0.25 * (1 - c);
+        } else {
+          const c = (k - 0.82) / 0.18;
+          this.playSquint = 0.35 * Math.sin(c * Math.PI); // 舔一下嘴
+          this.playHeadPitch = -0.04 * (1 - c);
+        }
         break;
       }
       default:
