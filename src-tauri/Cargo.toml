@@ -1,6 +1,6 @@
 [package]
 name = "kuro-cat-pet"
-version = "5.9.11"
+version = "5.9.12"
 description = "Cross-platform desktop cat typing & mouse companion for Windows and macOS"
 authors = ["Kevin Hao"]
 edition = "2021"

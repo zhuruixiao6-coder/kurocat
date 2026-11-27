@@ -790,6 +790,9 @@ export class KuroCatEngine3D {
   private playArmR = 0;
   private playReach = 0;
   private playSwing = 0;
+  private handRest = new Map<number, THREE.Vector3>();
+  private tmpSkinA = new THREE.Vector3();
+  private tmpSkinB = new THREE.Vector3();
   private annoy = 0;
   private lastPoke = -100;
   private isCross = false;
@@ -3118,6 +3121,15 @@ export class KuroCatEngine3D {
       this.attachLocal(arm.shoulderLocal, arm.shoulder);
       arm.hand.copy(pawTrack.pos);
 
+      // 手臂骨骼驱动：以肩关节为枢轴旋转「静止爪位」，IK 再把手链解到该目标
+      if (!this.playActive && !this.handRest.has(arm.s)) this.handRest.set(arm.s, arm.hand.clone());
+      const restHand = this.handRest.get(arm.s);
+      if (this.playActive && restHand) {
+        const bone = arm.s < 0 ? this.rig.armL : this.rig.armR;
+        const pivot = this.tmpSkinA.setFromMatrixPosition(bone.matrixWorld);
+        arm.hand.copy(pivot).add(this.tmpSkinB.copy(restHand).sub(pivot).applyQuaternion(bone.quaternion));
+      }
+
       const tuck = pawTrack.tuckWeight;
       const onMouse = arm.s < 0 && mousing;
       const reach = arm.shoulder.distanceTo(arm.hand);
@@ -3153,17 +3165,6 @@ export class KuroCatEngine3D {
       );
 
       // 空闲玩耍：让手臂自己抬/伸/摆，形成真实的肢体动作（不是整体滑动）
-      if (this.playActive) {
-        const sideLift = arm.s < 0 ? this.playArmL : this.playArmR;
-        const swing = this.playSwing * arm.s;
-        arm.hand.x += swing;
-        arm.hand.y += sideLift;
-        arm.hand.z += this.playReach;
-        arm.c1.y += sideLift * 0.55 + 0.02;
-        arm.c2.y += sideLift * 0.75;
-        arm.c2.z += this.playReach * 0.4;
-      }
-
       // Soft sculpted plush paw resting cleanly right behind top edge of keyboard when calm
       const pawScale = mix(1.0, 0.94, tuck);
       arm.paw.position.set(arm.hand.x, arm.hand.y - 0.010, arm.hand.z + 0.014);
