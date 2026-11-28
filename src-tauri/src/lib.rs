@@ -1111,17 +1111,42 @@ fn list_keyboard_presets() -> Vec<serde_json::Value> {
     out
 }
 
+/// 在系统文件管理器中打开文件夹。
+/// Windows 用 ShellExecuteW 而非直接 spawn explorer：
+/// 管理员权限下直接 spawn explorer 会因完整性级别不匹配被静默丢弃（表现为"点了没反应"），
+/// ShellExecuteW 走 shell 委托，普通/管理员权限都能正常打开。
+#[cfg(windows)]
+fn open_folder_in_shell(dir: &std::path::Path) -> Result<(), String> {
+    use std::ptr::{null, null_mut};
+    use windows_sys::Win32::UI::Shell::ShellExecuteW;
+    use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
+    let op: Vec<u16> = "open\0".encode_utf16().collect();
+    let path = dir.to_string_lossy().replace(char::from(92), "/");
+    let target: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
+    let ret = unsafe {
+        ShellExecuteW(
+            null_mut(),
+            op.as_ptr(),
+            target.as_ptr(),
+            null(),
+            null(),
+            SW_SHOWNORMAL,
+        )
+    };
+    // ShellExecuteW 返回值 > 32 表示成功
+    if ret as isize <= 32 {
+        return Err(format!("ShellExecuteW failed with code {}", ret as isize));
+    }
+    Ok(())
+}
+
 #[tauri::command]
 fn open_skin_folder() -> Result<(), String> {
     let dir = crate::config::app_data_dir().join("skins");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     #[cfg(windows)]
-    {
-        std::process::Command::new("explorer")
-            .arg(&dir)
-            .spawn()
-            .map_err(|e| e.to_string())?;
-    }
+    open_folder_in_shell(&dir)?;
     #[cfg(target_os = "macos")]
     {
         std::process::Command::new("/usr/bin/open")
@@ -1137,12 +1162,7 @@ fn open_keyboard_folder() -> Result<(), String> {
     let dir = crate::config::app_data_dir().join("keyboards");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     #[cfg(windows)]
-    {
-        std::process::Command::new("explorer")
-            .arg(&dir)
-            .spawn()
-            .map_err(|e| e.to_string())?;
-    }
+    open_folder_in_shell(&dir)?;
     Ok(())
 }
 
