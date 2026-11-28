@@ -1316,19 +1316,6 @@ async function bootstrap(): Promise<void> {
     }
   });
 
-  // 宠物控制 API：MCP 工具 → Rust pet_api → 本事件 → 引擎
-  await listen<{ action: string; kind?: string; expression?: string; durationMs?: number; active?: boolean }>(
-    'kuro-pet-command',
-    (ev) => {
-      const p = ev.payload ?? ({} as any);
-      if (p.action === 'playAction' && p.kind) engine3d?.runAction(p.kind);
-      else if (p.action === 'setExpression' && p.expression) engine3d?.setExpression(p.expression, p.durationMs ?? 2000);
-      else if (p.action === 'setPrivacy' && typeof p.active === 'boolean') {
-        void applySettingsPatch({ privacyPasswordGuard: p.active });
-      }
-    },
-  );
-
   await listen('kuro-gentle-demo', () => {
     engine3d?.playGentleSequence();
   });

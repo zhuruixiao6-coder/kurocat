@@ -142,61 +142,6 @@ fn tool_definitions() -> Value {
             }
         },
         {
-            "name": "get_pet_state",
-            "description": "Get the live desktop pet state: last triggered action, timestamp, energy (0-100), privacy mode, and whether the pet window is ready.",
-            "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
-        },
-        {
-            "name": "trigger_pet_action",
-            "description": "Trigger a one-shot pet animation on the desktop cat. Actions: gentle (groom+bunt+slow blink sequence), groom, bunt, softBlink, stretch, yawn, tailChase, pounce, swat, circle.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "action": {
-                        "type": "string",
-                        "enum": ["gentle","groom","bunt","softBlink","stretch","yawn","tailChase","pounce","swat","circle"],
-                        "description": "Which animation to play"
-                    },
-                    "durationMs": { "type": "number", "description": "Optional duration hint in ms (0 = use built-in timing)" }
-                },
-                "required": ["action"],
-                "additionalProperties": false
-            }
-        },
-        {
-            "name": "set_pet_expression",
-            "description": "Set a temporary facial expression on the desktop pet: idle, happy, shy, sleepy, blink.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "expression": { "type": "string", "enum": ["idle","happy","shy","sleepy","blink"] },
-                    "durationMs": { "type": "number", "description": "How long to hold the expression, 200-60000 ms (default 2000)" }
-                },
-                "required": ["expression"],
-                "additionalProperties": false
-            }
-        },
-        {
-            "name": "set_pet_energy",
-            "description": "Set the pet energy level (0-100). Low energy can be used by external agents to represent rest/feeding loops.",
-            "inputSchema": {
-                "type": "object",
-                "properties": { "energy": { "type": "number", "description": "0-100" } },
-                "required": ["energy"],
-                "additionalProperties": false
-            }
-        },
-        {
-            "name": "set_pet_privacy",
-            "description": "Turn the pet's password privacy mode on or off (covers eyes / stops reacting to keystrokes).",
-            "inputSchema": {
-                "type": "object",
-                "properties": { "active": { "type": "boolean" } },
-                "required": ["active"],
-                "additionalProperties": false
-            }
-        },
-        {
             "name": "update_settings",
             "description": "Update KuroCat desktop pet settings live (scale 0.2-1.5, showKeyBubbles, soundEnabled, alwaysOnTop, clickThroughLocked, catBreed, keyboardLayout 65|108, keyboardOrientation cat|viewer, tailKeyMode smart|custom|edge|off, tailKeyIds string[], keySoundEnabled, keySoundVolume 0-100, keySoundStyle mechanical|blue|thock|soft|typewriter|bubble|woodblock|droplet|coin|meow|custom, keySoundPack (folder name under %APPDATA%\\\\kuro-cat-pet\\\\sounds), autostart).",
             "inputSchema": {
@@ -247,40 +192,6 @@ fn err_text(msg: &str) -> Value {
 
 fn execute_tool(name: &str, args: &Value, on_change: &dyn Fn()) -> Value {
     match name {
-        "get_pet_state" => ok_text(crate::pet_api::snapshot()),
-        "trigger_pet_action" => {
-            let action = args.get("action").and_then(|v| v.as_str()).unwrap_or("");
-            if action.is_empty() {
-                return err_text("Missing required 'action' argument.");
-            }
-            let duration = args.get("durationMs").and_then(|v| v.as_u64()).unwrap_or(0);
-            match crate::pet_api::dispatch_action(action, if duration > 0 { Some(duration) } else { None }) {
-                Ok(v) => ok_text(v),
-                Err(e) => err_text(&e),
-            }
-        }
-        "set_pet_expression" => {
-            let expression = args.get("expression").and_then(|v| v.as_str()).unwrap_or("");
-            if expression.is_empty() {
-                return err_text("Missing required 'expression' argument.");
-            }
-            let duration = args.get("durationMs").and_then(|v| v.as_u64()).unwrap_or(2000);
-            match crate::pet_api::dispatch_expression(expression, duration) {
-                Ok(v) => ok_text(v),
-                Err(e) => err_text(&e),
-            }
-        }
-        "set_pet_energy" => {
-            let energy = args.get("energy").and_then(|v| v.as_u64()).unwrap_or(100) as u8;
-            ok_text(crate::pet_api::set_energy(energy))
-        }
-        "set_pet_privacy" => {
-            let active = args.get("active").and_then(|v| v.as_bool()).unwrap_or(false);
-            match crate::pet_api::set_privacy(active) {
-                Ok(v) => ok_text(v),
-                Err(e) => err_text(&e),
-            }
-        }
         "list_cats" => {
             let settings = load_settings();
             let cats = all_cats();
@@ -591,7 +502,6 @@ fn handle_http_conn(mut stream: TcpStream, enabled: &AtomicBool, on_change: &dyn
     let path = parts[1];
 
     let mut content_length: usize = 0;
-    let mut auth_header = String::new();
     loop {
         let mut header = String::new();
         if reader.read_line(&mut header).is_err() {
@@ -604,8 +514,6 @@ fn handle_http_conn(mut stream: TcpStream, enabled: &AtomicBool, on_change: &dyn
         if let Some((k, v)) = trimmed.split_once(':') {
             if k.eq_ignore_ascii_case("content-length") {
                 content_length = v.trim().parse().unwrap_or(0);
-            } else if k.eq_ignore_ascii_case("authorization") {
-                auth_header = v.trim().to_string();
             }
         }
     }
@@ -635,28 +543,6 @@ fn handle_http_conn(mut stream: TcpStream, enabled: &AtomicBool, on_change: &dyn
         .to_string();
         write_http_response(&mut stream, "200 OK", "application/json; charset=utf-8", &body);
         return;
-    }
-
-    // Bearer 鉴权：设置里配了 token 就必须带 Authorization: Bearer <token>
-    // 未配置 token 时保持旧行为（仅回环监听，兼容既有客户端）
-    {
-        let expected = crate::config::load_settings().mcp_token;
-        if !expected.trim().is_empty() {
-            let provided = auth_header
-                .strip_prefix("Bearer ")
-                .or_else(|| auth_header.strip_prefix("bearer "))
-                .unwrap_or("")
-                .trim();
-            if provided != expected.trim() {
-                write_http_response(
-                    &mut stream,
-                    "401 Unauthorized",
-                    "application/json; charset=utf-8",
-                    r#"{"error":"Missing or invalid Bearer token"}"#,
-                );
-                return;
-            }
-        }
     }
 
     if method == "POST" && (path == "/mcp" || path == "/") {
