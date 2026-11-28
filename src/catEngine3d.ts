@@ -781,6 +781,8 @@ export class KuroCatEngine3D {
   private playHistory: PlayKind3D[] = [];
   private gentleQueue: PlayKind3D[] = [];
   private gentleDemo = false;
+  private exprKind = '';
+  private exprUntil = 0;
   private playLean = 0;
   private playSquash = 0;
   private playHeadPitch = 0;
@@ -2140,6 +2142,46 @@ export class KuroCatEngine3D {
 
   /** 空闲自动玩耍：启用/阈值（秒）。不接触任何输入钩子，只读 lastInput。 */
   /** 行为展示：舔爪理毛 → 蹭头 → 缓慢眨眼（温柔三连，任意输入即中止） */
+  /** 外部 API：播放指定动作（'gentle' 为理毛→蹭头→眨眼三连） */
+  public runAction(kind: string): void {
+    const map: Record<string, PlayKind3D[]> = {
+      gentle: ['groom', 'bunt', 'softBlink'],
+      groom: ['groom'],
+      bunt: ['bunt'],
+      softBlink: ['softBlink'],
+      stretch: ['stretch'],
+      yawn: ['yawn'],
+      tailChase: ['tailChase'],
+      pounce: ['pounce'],
+      swat: ['swat'],
+      circle: ['circle'],
+    };
+    const seq = map[kind];
+    if (!seq) return;
+    this.wake();
+    this.asleep = false;
+    this.playActive = true;
+    this.gentleDemo = true;
+    this.playAct = null;
+    this.gentleQueue = [...seq];
+    this.playNextAt = this.elapsed + 0.12;
+  }
+
+  /** 外部 API：设置表情（idle/happy/shy/sleepy/blink），到时自动恢复 */
+  public setExpression(kind: string, durationMs: number): void {
+    const table: Record<string, { squint: number; pitch: number; yaw: number; roll: number }> = {
+      idle: { squint: 0, pitch: 0, yaw: 0, roll: 0 },
+      happy: { squint: 0.35, pitch: -0.06, yaw: 0, roll: 0.05 },
+      shy: { squint: 0.6, pitch: 0.08, yaw: 0.14, roll: 0.04 },
+      sleepy: { squint: 0.75, pitch: 0.14, yaw: 0, roll: 0.06 },
+      blink: { squint: 1.0, pitch: 0, yaw: 0, roll: 0 },
+    };
+    const spec = table[kind];
+    if (!spec) return;
+    this.exprKind = kind;
+    this.exprUntil = this.elapsed + Math.max(0.2, Math.min(60, durationMs / 1000));
+  }
+
   public playGentleSequence(): void {
     this.wake();
     this.asleep = false;
@@ -3245,6 +3287,11 @@ export class KuroCatEngine3D {
     const petActive = this.petting && !this.privacyMode && !this.isCross;
     this.squintAmt += ((petActive ? 1 : 0) - this.squintAmt) * approach(12, dt);
     if (this.playSquint > 0.01) this.squintAmt = Math.max(this.squintAmt, this.playSquint);
+    if (this.exprKind !== '' && this.elapsed < this.exprUntil) {
+      const spec: Record<string, number> = { idle: 0, happy: 0.35, shy: 0.6, sleepy: 0.75, blink: 1.0 };
+      const sq = spec[this.exprKind] ?? 0;
+      if (sq > 0.01) this.squintAmt = Math.max(this.squintAmt, sq);
+    }
 
     // Curious trigger from swift cursor sweep
     this.pointerSamples = this.pointerSamples.filter((s) => t - s.t <= 0.22);
@@ -3358,6 +3405,10 @@ export class KuroCatEngine3D {
     let targetRoll = 0;
     let targetGazeX = 0;
     let targetGazeY = 0;
+
+    // 外部 API 设置的表情（到期自动失效，不覆盖睡眠/隐私的优先级）
+    const exprActive = this.exprKind !== '' && this.elapsed < this.exprUntil;
+    if (!exprActive && this.exprKind !== '') this.exprKind = '';
 
     if (this.asleep || this.privacyMode) {
       targetPitch = 0.16;

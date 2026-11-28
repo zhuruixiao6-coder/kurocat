@@ -9,6 +9,7 @@ mod macos_perms;
 #[cfg(target_os = "macos")]
 mod macos_window;
 mod mcp;
+mod pet_api;
 mod obs;
 mod privacy;
 mod profile;
@@ -2854,6 +2855,8 @@ pub fn run() {
             );
             start_storage_watcher(handle.clone());
             updater::start_background_update_checker(handle.clone());
+
+            pet_api::init(handle.clone());
 
             let http_handle = handle.clone();
             let mcp_port = if s.mcp_port == 0 { 27420 } else { s.mcp_port };

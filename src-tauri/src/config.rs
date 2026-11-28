@@ -225,6 +225,9 @@ pub struct AppSettings {
     pub mcp_enabled: bool,
     #[serde(default = "default_mcp_port")]
     pub mcp_port: u16,
+    /// HTTP MCP 的 Bearer Token；为空表示不校验（仅回环监听）
+    #[serde(default)]
+    pub mcp_token: String,
     #[serde(default = "default_keyboard_layout")]
     pub keyboard_layout: String,
     #[serde(default = "default_keyboard_orientation")]
@@ -297,6 +300,7 @@ impl Default for AppSettings {
             cat_breed: default_cat_breed(),
             mcp_enabled: default_mcp_enabled(),
             mcp_port: default_mcp_port(),
+            mcp_token: String::new(),
             keyboard_layout: default_keyboard_layout(),
             keyboard_orientation: default_keyboard_orientation(),
             keyboard_preset: String::new(),
@@ -358,7 +362,9 @@ pub fn config_path() -> PathBuf {
 pub fn load_settings() -> AppSettings {
     let path = config_path();
     if let Ok(content) = fs::read_to_string(&path) {
-        if let Ok(mut parsed) = serde_json::from_str::<AppSettings>(&content) {
+        // 容忍外部编辑器写入的 UTF-8 BOM，否则整份设置会回退默认值
+        let content = content.trim_start_matches('\u{feff}');
+        if let Ok(mut parsed) = serde_json::from_str::<AppSettings>(content) {
             parsed.scale = parsed.scale.clamp(0.20, 1.50);
             parsed.tail_key_mode = normalize_tail_key_mode(&parsed.tail_key_mode);
             parsed.tail_key_ids = normalize_tail_key_ids(&parsed.tail_key_ids);
